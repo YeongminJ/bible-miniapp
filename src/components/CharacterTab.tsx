@@ -58,10 +58,10 @@ const ERA_PROMPTS: Record<string, string> = {
   "초대교회시대": "ancient Roman empire Mediterranean setting",
 };
 
-function getCharacterImageUrl(nameEn: string, era: string, title: string): string {
-  const eraHint = ERA_PROMPTS[era] || "ancient biblical setting";
-  const prompt = `Oil painting portrait of ${nameEn}, biblical figure, ${title}, ${eraHint}, warm lighting, classical renaissance art style, dignified expression, muted earth tones, no text, no watermark`;
-  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=256&height=256&nologo=true&seed=${nameEn.length * 7}`;
+const R2_BASE = "https://pub-7f6f4f93019b41ba9d9ade42f6e1cd25.r2.dev";
+
+function getCharacterImageUrl(id: number): string {
+  return `${R2_BASE}/characters/${id.toString().padStart(3, "0")}.jpg`;
 }
 
 export default function CharacterTab() {
@@ -92,7 +92,7 @@ export default function CharacterTab() {
             background: `linear-gradient(160deg, ${(ERA_COLORS[selectedChar.era] || ["#374151", "#6B7280"])[0]}, ${(ERA_COLORS[selectedChar.era] || ["#374151", "#6B7280"])[1]})`,
           }}>
             <img
-              src={getCharacterImageUrl(selectedChar.nameEn, selectedChar.era, selectedChar.title)}
+              src={getCharacterImageUrl(selectedChar.id)}
               alt={selectedChar.name}
               style={styles.heroImage}
             />
@@ -175,7 +175,7 @@ export default function CharacterTab() {
             >
               <div style={styles.charImageWrap}>
                 <img
-                  src={getCharacterImageUrl(char.nameEn, char.era, char.title)}
+                  src={getCharacterImageUrl(char.id)}
                   alt={char.name}
                   style={styles.charImage}
                   loading="lazy"
