@@ -1,7 +1,7 @@
 import { defineConfig } from "@apps-in-toss/web-framework/config";
 
 export default defineConfig({
-  appName: "bible-miniapp",
+  appName: "bible-mini",
   brand: {
     displayName: "오늘의 말씀",
     primaryColor: "#0D9488",

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import VerseAudio from "./VerseAudio";
 import { showInterstitialAd } from "../lib/ad";
 
@@ -28,6 +28,43 @@ export default function QuizTab() {
   const [dailyQuizzes, setDailyQuizzes] = useState<Quiz[]>([]);
   const [lives, setLives] = useState(MAX_LIVES);
   const [adLoading, setAdLoading] = useState(false);
+  const [showHeartBreak, setShowHeartBreak] = useState(false);
+  const [streak, setStreak] = useState(0);
+  const [totalPoints, setTotalPoints] = useState(0);
+  const [pointPopup, setPointPopup] = useState<{ text: string; key: number } | null>(null);
+  const [timer, setTimer] = useState(10);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [showConfetti, setShowConfetti] = useState(false);
+
+  const stopTimer = useCallback(() => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+  }, []);
+
+  // 타이머 시작
+  useEffect(() => {
+    if (difficulty === null || finished || selected !== null) return;
+    setTimer(10);
+    stopTimer();
+    timerRef.current = setInterval(() => {
+      setTimer((t) => {
+        if (t <= 1) {
+          stopTimer();
+          // 시간 초과 = 오답 처리
+          setSelected(-1);
+          setLives((l) => Math.max(0, l - 1));
+          setStreak(0);
+          setShowHeartBreak(true);
+          setTimeout(() => setShowHeartBreak(false), 750);
+          return 0;
+        }
+        return t - 1;
+      });
+    }, 1000);
+    return stopTimer;
+  }, [currentIndex, difficulty, finished, selected, stopTimer]);
 
   useEffect(() => {
     fetch(`${import.meta.env.BASE_URL}data/quizzes.json`)
@@ -48,6 +85,9 @@ export default function QuizTab() {
     setScore(0);
     setFinished(false);
     setLives(MAX_LIVES);
+    setStreak(0);
+    setTotalPoints(0);
+    setShowConfetti(false);
   };
 
   // 난이도 선택 화면
@@ -94,15 +134,36 @@ export default function QuizTab() {
 
   // 결과 화면
   if (finished) {
+    if (score === 5 && !showConfetti) {
+      setShowConfetti(true);
+    }
     return (
       <div style={styles.container}>
+        {/* 폭죽 효과 */}
+        {showConfetti && (
+          <div style={styles.confettiContainer}>
+            {Array.from({ length: 30 }, (_, i) => (
+              <div key={i} style={{
+                ...styles.confettiPiece,
+                left: `${Math.random() * 100}%`,
+                backgroundColor: ["#EF4444", "#F59E0B", "#10B981", "#3B82F6", "#8B5CF6", "#EC4899"][i % 6],
+                animationDelay: `${Math.random() * 0.5}s`,
+                animationDuration: `${1 + Math.random() * 1.5}s`,
+                width: `${6 + Math.random() * 6}px`,
+                height: `${6 + Math.random() * 6}px`,
+                borderRadius: Math.random() > 0.5 ? "50%" : "2px",
+              }} />
+            ))}
+          </div>
+        )}
         <div style={styles.resultCard}>
           <div style={styles.resultIcon}>
             {score >= 4 ? "🏆" : score >= 2 ? "👏" : "📖"}
           </div>
           <div style={styles.resultScore}>{score}/5</div>
+          <div style={styles.resultPoints}>⭐ {totalPoints}점</div>
           <div style={styles.resultText}>
-            {score === 5 ? "완벽해요! 성경 박사시네요!"
+            {score === 5 ? "🎉 퍼펙트! 성경 박사시네요!"
               : score >= 3 ? "잘하셨어요! 말씀을 잘 알고 계시네요."
               : "더 많은 말씀을 읽어보아요!"}
           </div>
@@ -123,6 +184,49 @@ export default function QuizTab() {
 
   return (
     <div style={styles.container}>
+      {/* 하트 깨짐 애니메이션 */}
+      {showHeartBreak && (
+        <div style={styles.heartOverlay}>
+          <div style={styles.heartBreakAnim}>
+            <span style={styles.heartLeft}>💔</span>
+          </div>
+        </div>
+      )}
+
+      {/* 스타일 태그 */}
+      <style>{`
+        @keyframes heartShake {
+          0% { transform: scale(0.7); opacity: 1; }
+          15% { transform: scale(1.2) rotate(-5deg); }
+          30% { transform: scale(1.1) rotate(5deg); }
+          45% { transform: scale(0.95) rotate(-3deg); }
+          60% { transform: scale(0.8); opacity: 0.8; }
+          100% { transform: scale(0.3) translateY(30px); opacity: 0; }
+        }
+        @keyframes timerPulse {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.15); }
+        }
+        @keyframes pointFloat {
+          0% { transform: translateY(0) scale(1); opacity: 1; }
+          100% { transform: translateY(-60px) scale(1.3); opacity: 0; }
+        }
+        @keyframes streakGlow {
+          0%, 100% { text-shadow: 0 0 4px rgba(249,115,22,0.3); }
+          50% { text-shadow: 0 0 12px rgba(249,115,22,0.6); }
+        }
+        @keyframes confettiFall {
+          0% { transform: translateY(-20px) rotate(0deg); opacity: 1; }
+          100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+        }
+        @keyframes overlayFade {
+          0% { opacity: 0; }
+          10% { opacity: 1; }
+          60% { opacity: 1; }
+          100% { opacity: 0; }
+        }
+      `}</style>
+
       {/* 상단 바 */}
       <div style={styles.topBar}>
         <button style={styles.backLink} onClick={() => setDifficulty(null)}>← 난이도</button>
@@ -135,6 +239,45 @@ export default function QuizTab() {
             ))}
           </span>
           <span style={styles.diffBadge}>{difficulty}</span>
+        </div>
+      </div>
+
+      {/* 포인트 팝업 */}
+      {pointPopup && (
+        <div key={pointPopup.key} style={styles.pointPopup}>
+          {pointPopup.text}
+        </div>
+      )}
+
+      {/* 타이머 + 스트릭 + 점수 */}
+      <div style={styles.gameBar}>
+        <div style={styles.timerRing}>
+          <svg width="40" height="40" viewBox="0 0 40 40">
+            <circle cx="20" cy="20" r="16" fill="none" stroke="#E5E7EB" strokeWidth="4" />
+            <circle
+              cx="20" cy="20" r="16" fill="none"
+              stroke={timer <= 3 ? "#EF4444" : "#0D9488"}
+              strokeWidth="4"
+              strokeLinecap="round"
+              strokeDasharray={`${2 * Math.PI * 16}`}
+              strokeDashoffset={`${2 * Math.PI * 16 * (1 - timer / 10)}`}
+              transform="rotate(-90 20 20)"
+              style={{ transition: "stroke-dashoffset 1s linear, stroke 0.3s" }}
+            />
+          </svg>
+          <span style={{
+            ...styles.timerText,
+            color: timer <= 3 ? "#EF4444" : "#374151",
+            animation: timer <= 3 ? "timerPulse 0.5s ease infinite" : "none",
+          }}>{timer}</span>
+        </div>
+        {streak >= 2 && (
+          <div style={styles.streakBadge}>
+            🔥 {streak}연속!
+          </div>
+        )}
+        <div style={styles.pointsBadge}>
+          ⭐ {totalPoints}
         </div>
       </div>
 
@@ -192,11 +335,24 @@ export default function QuizTab() {
               }}
               onClick={() => {
                 if (selected !== null) return;
+                stopTimer();
                 setSelected(i);
                 if (i === quiz.answer) {
+                  const newStreak = streak + 1;
+                  setStreak(newStreak);
                   setScore((s) => s + 1);
+                  const bonus = newStreak >= 3 ? 300 : newStreak >= 2 ? 200 : 100;
+                  const timeBonus = timer >= 7 ? 50 : timer >= 4 ? 25 : 0;
+                  const pts = bonus + timeBonus;
+                  setTotalPoints((p) => p + pts);
+                  const label = newStreak >= 3 ? `🔥x${newStreak} +${pts}` : newStreak >= 2 ? `🔥 +${pts}` : `+${pts}`;
+                  setPointPopup({ text: label, key: Date.now() });
+                  setTimeout(() => setPointPopup(null), 800);
                 } else {
+                  setStreak(0);
                   setLives((l) => Math.max(0, l - 1));
+                  setShowHeartBreak(true);
+                  setTimeout(() => setShowHeartBreak(false), 750);
                 }
               }}
             >
@@ -285,6 +441,65 @@ const styles: Record<string, React.CSSProperties> = {
   },
   adButton: {
     backgroundColor: "#F59E0B",
+  },
+  // Game bar
+  gameBar: {
+    display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px",
+  },
+  timerRing: {
+    position: "relative" as const,
+    width: "40px", height: "40px",
+    display: "flex", alignItems: "center", justifyContent: "center",
+  },
+  timerText: {
+    position: "absolute" as const,
+    fontSize: "14px", fontWeight: 900,
+  },
+  streakBadge: {
+    padding: "4px 12px", borderRadius: "100px",
+    backgroundColor: "#FFF7ED", color: "#EA580C",
+    fontSize: "13px", fontWeight: 800,
+    animation: "streakGlow 1s ease infinite",
+  },
+  pointsBadge: {
+    marginLeft: "auto",
+    padding: "4px 12px", borderRadius: "100px",
+    backgroundColor: "#FFFBEB", color: "#B45309",
+    fontSize: "13px", fontWeight: 800,
+  },
+  pointPopup: {
+    position: "fixed" as const, top: "40%", left: "50%",
+    transform: "translateX(-50%)", zIndex: 1000,
+    fontSize: "28px", fontWeight: 900, color: "#F59E0B",
+    animation: "pointFloat 0.8s ease forwards",
+    pointerEvents: "none" as const,
+    textShadow: "0 2px 8px rgba(245,158,11,0.3)",
+  },
+  resultPoints: {
+    fontSize: "20px", fontWeight: 800, color: "#B45309", marginBottom: "8px",
+  },
+  confettiContainer: {
+    position: "fixed" as const, inset: 0, zIndex: 998,
+    pointerEvents: "none" as const, overflow: "hidden",
+  },
+  confettiPiece: {
+    position: "absolute" as const, top: "-10px",
+    animation: "confettiFall 2s ease forwards",
+  },
+  heartOverlay: {
+    position: "fixed" as const, inset: 0, zIndex: 999,
+    display: "flex", alignItems: "center", justifyContent: "center",
+    backgroundColor: "rgba(239, 68, 68, 0.08)",
+    pointerEvents: "none" as const,
+    animation: "overlayFade 0.75s ease forwards",
+  },
+  heartBreakAnim: {
+    display: "flex", alignItems: "center", justifyContent: "center",
+  },
+  heartLeft: {
+    fontSize: "56px",
+    animation: "heartShake 0.75s ease forwards",
+    filter: "drop-shadow(0 4px 24px rgba(239,68,68,0.4))",
   },
   // Progress
   progressBar: { display: "flex", gap: "8px", marginBottom: "24px" },
