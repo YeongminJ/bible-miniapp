@@ -1,5 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { loadFullScreenAd, showFullScreenAd } from "@apps-in-toss/web-framework";
 import VerseAudio from "./VerseAudio";
+
+// TODO: 실제 앱인토스 콘솔에서 발급받은 광고 그룹 ID로 교체해주세요.
+const AD_GROUP_ID = "";
 
 interface Character {
   id: number;
@@ -14,6 +18,38 @@ interface Character {
   keyVerseText: string;
   lessonForToday: string;
   books: string[];
+}
+
+interface RelatedVerse {
+  reference: string;
+  text: string;
+}
+
+interface CharacterDetail {
+  background?: string;
+  personality?: string;
+  events?: string[];
+  strengths?: string[];
+  relatedVerses?: RelatedVerse[];
+  legacy?: string;
+}
+
+interface QuizOption {
+  text: string;
+  weights: Record<string, number>;
+}
+
+interface QuizQuestion {
+  id: number;
+  question: string;
+  options: QuizOption[];
+}
+
+interface QuizData {
+  traits: Record<string, string>;
+  questions: QuizQuestion[];
+  virtueToTraits: Record<string, string[]>;
+  matchPoolIds: number[];
 }
 
 const ERAS = ["전체", "구약", "신약"];
@@ -44,52 +80,193 @@ function getVirtueIcon(virtue: string): string {
   return VIRTUE_ICONS[virtue] || "✦";
 }
 
-// 시대별 프롬프트 힌트
-const ERA_PROMPTS: Record<string, string> = {
-  "창조시대": "ancient garden paradise setting",
-  "족장시대": "desert nomad tent camp setting",
-  "출애굽시대": "ancient Egyptian and desert setting",
-  "사사시대": "ancient Canaan battlefield setting",
-  "통일왕국": "ancient royal palace Jerusalem setting",
-  "분열왕국": "ancient divided kingdom temple setting",
-  "포로시대": "ancient Babylon exile setting",
-  "귀환시대": "rebuilt Jerusalem temple setting",
-  "복음서시대": "ancient Galilee village setting",
-  "초대교회시대": "ancient Roman empire Mediterranean setting",
-};
-
 const R2_BASE = "https://pub-7f6f4f93019b41ba9d9ade42f6e1cd25.r2.dev";
 
 function getCharacterImageUrl(id: number): string {
   return `${R2_BASE}/characters/${id.toString().padStart(3, "0")}.jpg`;
 }
 
+type QuizPhase = "intro" | "playing" | "result";
+
 export default function CharacterTab() {
   const [characters, setCharacters] = useState<Character[]>([]);
+  const [details, setDetails] = useState<Record<string, CharacterDetail>>({});
+  const [quizData, setQuizData] = useState<QuizData | null>(null);
+
   const [filter, setFilter] = useState("전체");
   const [selectedChar, setSelectedChar] = useState<Character | null>(null);
 
+  const [quizPhase, setQuizPhase] = useState<QuizPhase>("intro");
+  const [answers, setAnswers] = useState<number[]>([]);
+  const [currentQuestion, setCurrentQuestion] = useState(0);
+  const [matchedChar, setMatchedChar] = useState<Character | null>(null);
+  const [lastAnswerIndex, setLastAnswerIndex] = useState<number | null>(null);
+  const [adLoading, setAdLoading] = useState(false);
+
   useEffect(() => {
-    fetch(`${import.meta.env.BASE_URL}data/characters.json`)
-      .then((r) => r.json())
-      .then(setCharacters);
+    const base = import.meta.env.BASE_URL;
+    Promise.all([
+      fetch(`${base}data/characters.json`).then((r) => r.json()),
+      fetch(`${base}data/characterDetails.json`).then((r) => r.json()).catch(() => ({})),
+      fetch(`${base}data/characterQuiz.json`).then((r) => r.json()).catch(() => null),
+    ]).then(([chars, dets, quiz]) => {
+      setCharacters(chars);
+      setDetails(dets);
+      setQuizData(quiz);
+    });
   }, []);
 
-  const filtered = filter === "전체"
-    ? characters
-    : characters.filter((c) => c.testament === filter);
+  const filtered = useMemo(
+    () => (filter === "전체" ? characters : characters.filter((c) => c.testament === filter)),
+    [filter, characters]
+  );
 
+  function startQuiz() {
+    setAnswers([]);
+    setCurrentQuestion(0);
+    setMatchedChar(null);
+    setLastAnswerIndex(null);
+    setAdLoading(false);
+    setQuizPhase("playing");
+  }
+
+  function pickOption(optionIndex: number) {
+    if (!quizData) return;
+    const isLast = currentQuestion >= quizData.questions.length - 1;
+
+    if (isLast) {
+      // 마지막 질문: 자동으로 넘기지 않고 광고 게이트로 진입
+      setLastAnswerIndex(optionIndex);
+      return;
+    }
+
+    const nextAnswers = [...answers, optionIndex];
+    setAnswers(nextAnswers);
+    setCurrentQuestion((i) => i + 1);
+  }
+
+  function goBackQuestion() {
+    if (currentQuestion === 0) {
+      setQuizPhase("intro");
+      return;
+    }
+    setLastAnswerIndex(null);
+    setAnswers(answers.slice(0, -1));
+    setCurrentQuestion((i) => i - 1);
+  }
+
+  function handleWatchAdAndFinish() {
+    if (!quizData || lastAnswerIndex === null) return;
+    const finalAnswers = [...answers, lastAnswerIndex];
+
+    const canUseAd =
+      Boolean(AD_GROUP_ID) &&
+      typeof loadFullScreenAd?.isSupported === "function" &&
+      loadFullScreenAd.isSupported() &&
+      typeof showFullScreenAd?.isSupported === "function" &&
+      showFullScreenAd.isSupported();
+
+    if (!canUseAd) {
+      // 광고 미지원 환경: 바로 결과 공개
+      finishQuiz(finalAnswers);
+      return;
+    }
+
+    setAdLoading(true);
+    let settled = false;
+    const finishOnce = () => {
+      if (settled) return;
+      settled = true;
+      setAdLoading(false);
+      finishQuiz(finalAnswers);
+    };
+
+    try {
+      loadFullScreenAd({
+        options: { adGroupId: AD_GROUP_ID },
+        onEvent: (event) => {
+          if (event.type === "loaded") {
+            showFullScreenAd({
+              options: { adGroupId: AD_GROUP_ID },
+              onEvent: (showEvent) => {
+                if (
+                  showEvent.type === "dismissed" ||
+                  showEvent.type === "failedToShow" ||
+                  showEvent.type === "userEarnedReward"
+                ) {
+                  finishOnce();
+                }
+              },
+              onError: () => finishOnce(),
+            });
+          }
+        },
+        onError: () => finishOnce(),
+      });
+    } catch {
+      finishOnce();
+    }
+  }
+
+  function finishQuiz(finalAnswers: number[]) {
+    if (!quizData || characters.length === 0) return;
+
+    const userTraits: Record<string, number> = {};
+    quizData.questions.forEach((q, qi) => {
+      const opt = q.options[finalAnswers[qi]];
+      if (!opt) return;
+      Object.entries(opt.weights).forEach(([key, val]) => {
+        userTraits[key] = (userTraits[key] || 0) + val;
+      });
+    });
+
+    const pool = characters.filter((c) => quizData.matchPoolIds.includes(c.id));
+
+    let best: Character | null = null;
+    let bestScore = -1;
+    for (const c of pool) {
+      const charTraits = quizData.virtueToTraits[c.keyVirtue] || [];
+      let score = 0;
+      charTraits.forEach((t, idx) => {
+        const weight = idx === 0 ? 1.0 : 0.6;
+        score += (userTraits[t] || 0) * weight;
+      });
+      if (score > bestScore) {
+        bestScore = score;
+        best = c;
+      }
+    }
+
+    setMatchedChar(best);
+    setQuizPhase("result");
+  }
+
+  function resetQuiz() {
+    setMatchedChar(null);
+    setAnswers([]);
+    setCurrentQuestion(0);
+    setLastAnswerIndex(null);
+    setAdLoading(false);
+    setQuizPhase("intro");
+  }
+
+  // ============ 상세 화면 ============
   if (selectedChar) {
+    const colors = ERA_COLORS[selectedChar.era] || ["#374151", "#6B7280"];
+    const detail = details[String(selectedChar.id)];
+    const extraVerses = detail?.relatedVerses?.filter(
+      (v) => v.reference !== selectedChar.keyVerse
+    ) || [];
+
     return (
       <div style={styles.container}>
         <button style={styles.backButton} onClick={() => setSelectedChar(null)}>
           ← 목록으로
         </button>
         <div style={styles.detailCard}>
-          {/* 히어로 배너 */}
           <div style={{
             ...styles.heroBanner,
-            background: `linear-gradient(160deg, ${(ERA_COLORS[selectedChar.era] || ["#374151", "#6B7280"])[0]}, ${(ERA_COLORS[selectedChar.era] || ["#374151", "#6B7280"])[1]})`,
+            background: `linear-gradient(160deg, ${colors[0]}, ${colors[1]})`,
           }}>
             <img
               src={getCharacterImageUrl(selectedChar.id)}
@@ -113,17 +290,72 @@ export default function CharacterTab() {
           </div>
 
           <div style={styles.section}>
-            <div style={styles.sectionTitle}>인물 소개</div>
+            <div style={styles.sectionTitle}>📖 인물 소개</div>
             <div style={styles.sectionContent}>{selectedChar.summary}</div>
           </div>
 
+          {detail?.background && (
+            <div style={styles.section}>
+              <div style={styles.sectionTitle}>🕯️ 배경과 시대</div>
+              <div style={styles.sectionContent}>{detail.background}</div>
+            </div>
+          )}
+
+          {detail?.personality && (
+            <div style={styles.section}>
+              <div style={styles.sectionTitle}>🎭 성품과 기질</div>
+              <div style={styles.sectionContent}>{detail.personality}</div>
+            </div>
+          )}
+
+          {detail?.events && detail.events.length > 0 && (
+            <div style={styles.section}>
+              <div style={styles.sectionTitle}>⏳ 주요 사건</div>
+              <ul style={styles.eventList}>
+                {detail.events.map((e, i) => (
+                  <li key={i} style={styles.eventItem}>{e}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {detail?.strengths && detail.strengths.length > 0 && (
+            <div style={styles.section}>
+              <div style={styles.sectionTitle}>💪 대표 강점</div>
+              <div style={styles.chipRow}>
+                {detail.strengths.map((s) => (
+                  <span key={s} style={styles.strengthChip}>{s}</span>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div style={{ marginBottom: "16px" }}>
-            <div style={{ fontSize: "12px", fontWeight: 700, color: "#9CA3AF", marginBottom: "8px", letterSpacing: "1px" }}>핵심 말씀</div>
+            <div style={styles.sectionTitle}>🔖 핵심 말씀</div>
             <VerseAudio
               reference={selectedChar.keyVerse}
               verseText={selectedChar.keyVerseText}
             />
           </div>
+
+          {extraVerses.length > 0 && (
+            <div style={styles.section}>
+              <div style={styles.sectionTitle}>📚 함께 읽으면 좋은 말씀</div>
+              {extraVerses.map((v, i) => (
+                <div key={i} style={styles.extraVerse}>
+                  <div style={styles.extraVerseText}>"{v.text}"</div>
+                  <div style={styles.extraVerseRef}>— {v.reference}</div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {detail?.legacy && (
+            <div style={styles.section}>
+              <div style={styles.sectionTitle}>🌟 유산과 의미</div>
+              <div style={styles.sectionContent}>{detail.legacy}</div>
+            </div>
+          )}
 
           <div style={styles.lessonCard}>
             <div style={styles.lessonLabel}>💭 오늘의 묵상</div>
@@ -140,9 +372,118 @@ export default function CharacterTab() {
     );
   }
 
+  // ============ 목록 화면 ============
   return (
     <div style={styles.container}>
+      {/* 매칭 퀴즈 섹션 */}
+      {quizData && (
+        <div style={styles.quizWrap}>
+          {quizPhase === "intro" && (
+            <div style={styles.quizIntro}>
+              <div style={styles.quizSparkle}>✨</div>
+              <div style={styles.quizTitle}>나와 닮은 성경 인물은 누구일까?</div>
+              <div style={styles.quizDesc}>
+                {quizData.questions.length}가지 질문으로 나와 가장 닮은 인물을 찾아보세요
+              </div>
+              <button style={styles.quizStartBtn} onClick={startQuiz}>
+                시작하기
+              </button>
+            </div>
+          )}
+
+          {quizPhase === "playing" && (
+            <div style={styles.quizPlay}>
+              <div style={styles.quizProgressRow}>
+                <button style={styles.quizBackBtn} onClick={goBackQuestion}>
+                  ←
+                </button>
+                <div style={styles.quizProgressText}>
+                  {currentQuestion + 1} / {quizData.questions.length}
+                </div>
+                <div style={{ width: "32px" }} />
+              </div>
+              <div style={styles.quizProgressBar}>
+                <div
+                  style={{
+                    ...styles.quizProgressFill,
+                    width: `${((currentQuestion + 1) / quizData.questions.length) * 100}%`,
+                  }}
+                />
+              </div>
+              <div style={styles.quizQuestion}>
+                {quizData.questions[currentQuestion].question}
+              </div>
+              <div style={styles.quizOptions}>
+                {quizData.questions[currentQuestion].options.map((opt, i) => {
+                  const isLast = currentQuestion >= quizData.questions.length - 1;
+                  const isSelected = isLast && lastAnswerIndex === i;
+                  return (
+                    <button
+                      key={`${quizData.questions[currentQuestion].id}-${i}`}
+                      style={isSelected ? styles.quizOptionSelected : styles.quizOption}
+                      disabled={adLoading}
+                      onClick={(e) => {
+                        (e.currentTarget as HTMLButtonElement).blur();
+                        pickOption(i);
+                      }}
+                    >
+                      {opt.text}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {currentQuestion >= quizData.questions.length - 1 && (
+                <button
+                  style={{
+                    ...styles.quizAdButton,
+                    opacity: lastAnswerIndex === null || adLoading ? 0.5 : 1,
+                    cursor: lastAnswerIndex === null || adLoading ? "not-allowed" : "pointer",
+                  }}
+                  disabled={lastAnswerIndex === null || adLoading}
+                  onClick={handleWatchAdAndFinish}
+                >
+                  {adLoading ? "광고 불러오는 중…" : "🎬 광고보고 나에게 맞는 인물 확인하기"}
+                </button>
+              )}
+            </div>
+          )}
+
+          {quizPhase === "result" && matchedChar && (
+            <div style={{
+              ...styles.quizResult,
+              background: `linear-gradient(160deg, ${(ERA_COLORS[matchedChar.era] || ["#374151", "#6B7280"])[0]}, ${(ERA_COLORS[matchedChar.era] || ["#374151", "#6B7280"])[1]})`,
+            }}>
+              <div style={styles.quizResultLabel}>나와 가장 닮은 인물</div>
+              <img
+                src={getCharacterImageUrl(matchedChar.id)}
+                alt={matchedChar.name}
+                style={styles.quizResultImage}
+              />
+              <div style={styles.quizResultName}>{matchedChar.name}</div>
+              <div style={styles.quizResultTitle}>{matchedChar.title}</div>
+              <div style={styles.quizResultVirtue}>
+                {getVirtueIcon(matchedChar.keyVirtue)} {matchedChar.keyVirtue}
+              </div>
+              <div style={styles.quizResultSummary}>{matchedChar.summary}</div>
+              <div style={styles.quizResultButtons}>
+                <button
+                  style={styles.quizResultDetailBtn}
+                  onClick={() => setSelectedChar(matchedChar)}
+                >
+                  자세히 보기
+                </button>
+                <button style={styles.quizResultRetryBtn} onClick={resetQuiz}>
+                  다시 하기
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* 필터 */}
+      <div style={styles.listHeader}>인물 목록</div>
       <div style={styles.filterRow}>
         {ERAS.map((era) => (
           <button
@@ -198,6 +539,7 @@ export default function CharacterTab() {
 
 const styles: Record<string, React.CSSProperties> = {
   container: { padding: "16px" },
+  listHeader: { fontSize: "15px", fontWeight: 800, color: "#111827", marginTop: "24px", marginBottom: "12px" },
   filterRow: { display: "flex", gap: "8px", marginBottom: "16px", alignItems: "center" },
   filterButton: {
     padding: "8px 16px", borderRadius: "100px", fontSize: "13px",
@@ -234,6 +576,118 @@ const styles: Record<string, React.CSSProperties> = {
   charVirtue: {
     fontSize: "10px", fontWeight: 700, color: "#FFFFFF",
     backgroundColor: "rgba(255,255,255,0.2)", padding: "2px 8px", borderRadius: "100px",
+  },
+  // Quiz
+  quizWrap: { marginBottom: "8px" },
+  quizIntro: {
+    padding: "28px 20px", borderRadius: "24px",
+    background: "linear-gradient(135deg, #0D9488 0%, #6D28D9 100%)",
+    color: "#FFFFFF", textAlign: "center" as const,
+    boxShadow: "0 8px 24px rgba(13,148,136,0.25)",
+  },
+  quizSparkle: { fontSize: "36px", marginBottom: "8px" },
+  quizTitle: { fontSize: "18px", fontWeight: 900, marginBottom: "6px", letterSpacing: "-0.5px" },
+  quizDesc: { fontSize: "13px", color: "rgba(255,255,255,0.85)", marginBottom: "18px", lineHeight: "1.5" },
+  quizStartBtn: {
+    padding: "12px 28px", borderRadius: "100px",
+    backgroundColor: "#FFFFFF", color: "#0D9488",
+    fontSize: "14px", fontWeight: 800, border: "none", cursor: "pointer",
+    boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+  },
+  quizPlay: {
+    padding: "20px", borderRadius: "24px",
+    backgroundColor: "#FFFFFF",
+    boxShadow: "0 4px 16px rgba(0,0,0,0.06)",
+  },
+  quizProgressRow: {
+    display: "flex", alignItems: "center", justifyContent: "space-between",
+    marginBottom: "8px",
+  },
+  quizBackBtn: {
+    width: "32px", height: "32px", borderRadius: "50%",
+    border: "none", backgroundColor: "#F3F4F6",
+    color: "#6B7280", fontSize: "16px", cursor: "pointer",
+  },
+  quizProgressText: { fontSize: "12px", fontWeight: 700, color: "#9CA3AF" },
+  quizProgressBar: {
+    width: "100%", height: "4px", borderRadius: "100px",
+    backgroundColor: "#F3F4F6", overflow: "hidden", marginBottom: "20px",
+  },
+  quizProgressFill: {
+    height: "100%", backgroundColor: "#0D9488",
+    transition: "width 0.3s ease",
+  },
+  quizQuestion: {
+    fontSize: "17px", fontWeight: 800, color: "#111827",
+    marginBottom: "18px", lineHeight: "1.4", letterSpacing: "-0.3px",
+  },
+  quizOptions: { display: "flex", flexDirection: "column", gap: "10px" },
+  quizOption: {
+    padding: "14px 16px", borderRadius: "14px",
+    backgroundColor: "#F9FAFB", color: "#1F2937",
+    fontSize: "14px", fontWeight: 600, border: "1px solid #E5E7EB",
+    cursor: "pointer", textAlign: "left" as const, lineHeight: "1.4",
+    outline: "none", WebkitTapHighlightColor: "transparent",
+  },
+  quizOptionSelected: {
+    padding: "14px 16px", borderRadius: "14px",
+    backgroundColor: "#F0FDFA", color: "#0F766E",
+    fontSize: "14px", fontWeight: 700, border: "1.5px solid #0D9488",
+    cursor: "pointer", textAlign: "left" as const, lineHeight: "1.4",
+    outline: "none", WebkitTapHighlightColor: "transparent",
+  },
+  quizAdButton: {
+    marginTop: "16px", width: "100%",
+    padding: "14px 16px", borderRadius: "100px",
+    background: "linear-gradient(135deg, #0D9488 0%, #6D28D9 100%)",
+    color: "#FFFFFF", fontSize: "14px", fontWeight: 800,
+    border: "none", outline: "none",
+    boxShadow: "0 4px 12px rgba(13,148,136,0.25)",
+    WebkitTapHighlightColor: "transparent",
+  },
+  quizResult: {
+    padding: "28px 20px", borderRadius: "24px",
+    color: "#FFFFFF", textAlign: "center" as const,
+    boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
+  },
+  quizResultLabel: {
+    fontSize: "12px", fontWeight: 700, letterSpacing: "2px",
+    color: "rgba(255,255,255,0.8)", marginBottom: "12px",
+  },
+  quizResultImage: {
+    width: "100px", height: "100px", borderRadius: "50%",
+    objectFit: "cover" as const, margin: "0 auto 12px",
+    border: "3px solid rgba(255,255,255,0.5)",
+    boxShadow: "0 8px 24px rgba(0,0,0,0.3)",
+    display: "block",
+  },
+  quizResultName: { fontSize: "22px", fontWeight: 900, marginBottom: "4px" },
+  quizResultTitle: { fontSize: "13px", color: "rgba(255,255,255,0.85)", marginBottom: "10px" },
+  quizResultVirtue: {
+    display: "inline-block",
+    padding: "4px 14px", borderRadius: "100px",
+    backgroundColor: "rgba(255,255,255,0.2)",
+    fontSize: "12px", fontWeight: 700,
+    marginBottom: "14px",
+  },
+  quizResultSummary: {
+    fontSize: "13px", lineHeight: "1.6",
+    color: "rgba(255,255,255,0.9)", marginBottom: "18px",
+    textAlign: "left" as const,
+    padding: "12px 14px", borderRadius: "12px",
+    backgroundColor: "rgba(0,0,0,0.18)",
+  },
+  quizResultButtons: { display: "flex", gap: "8px" },
+  quizResultDetailBtn: {
+    flex: 1, padding: "12px", borderRadius: "100px",
+    backgroundColor: "#FFFFFF", color: "#111827",
+    fontSize: "13px", fontWeight: 800, border: "none", cursor: "pointer",
+  },
+  quizResultRetryBtn: {
+    flex: 1, padding: "12px", borderRadius: "100px",
+    backgroundColor: "rgba(255,255,255,0.18)", color: "#FFFFFF",
+    fontSize: "13px", fontWeight: 800,
+    border: "1px solid rgba(255,255,255,0.3)", cursor: "pointer",
   },
   // Detail
   backButton: {
@@ -279,15 +733,30 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 700, backgroundColor: "#F0FDFA", color: "#0D9488",
   },
   section: { marginBottom: "20px" },
-  sectionTitle: { fontSize: "13px", fontWeight: 700, color: "#9CA3AF", marginBottom: "8px", letterSpacing: "1px" },
+  sectionTitle: { fontSize: "13px", fontWeight: 700, color: "#9CA3AF", marginBottom: "8px", letterSpacing: "0.5px" },
   sectionContent: { fontSize: "15px", color: "#374151", lineHeight: "1.7" },
-  verseCard: {
-    padding: "20px", backgroundColor: "#F0FDFA", borderRadius: "16px",
-    marginBottom: "16px", borderLeft: "4px solid #0D9488",
+  eventList: {
+    margin: 0, paddingLeft: "18px",
+    fontSize: "14px", color: "#374151", lineHeight: "1.75",
   },
-  verseLabel: { fontSize: "12px", fontWeight: 700, color: "#0D9488", marginBottom: "8px" },
-  verseText: { fontSize: "15px", color: "#115E59", fontStyle: "italic", lineHeight: "1.6", marginBottom: "8px" },
-  verseRef: { fontSize: "12px", color: "#6B7280" },
+  eventItem: { marginBottom: "4px" },
+  chipRow: { display: "flex", gap: "6px", flexWrap: "wrap" },
+  strengthChip: {
+    padding: "6px 12px", borderRadius: "100px",
+    backgroundColor: "#F0FDFA", color: "#0F766E",
+    fontSize: "12px", fontWeight: 700,
+    border: "1px solid #CCFBF1",
+  },
+  extraVerse: {
+    padding: "12px 14px", borderRadius: "12px",
+    backgroundColor: "#F9FAFB", marginBottom: "8px",
+    borderLeft: "3px solid #0D9488",
+  },
+  extraVerseText: {
+    fontSize: "14px", color: "#374151", lineHeight: "1.6",
+    marginBottom: "4px", fontStyle: "italic" as const,
+  },
+  extraVerseRef: { fontSize: "12px", color: "#6B7280", fontWeight: 600 },
   lessonCard: {
     padding: "20px", borderRadius: "16px", marginBottom: "16px",
     background: "linear-gradient(135deg, rgba(13,148,136,0.06), rgba(109,66,181,0.04))",

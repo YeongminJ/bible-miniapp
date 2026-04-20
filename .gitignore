@@ -1,0 +1,11 @@
+.claude/settings.local.json
+
+# Build output
+dist/
+
+# Apps-in-Toss tool cache and artifacts
+.granite/
+*.ait
+
+# Dependencies
+node_modules/

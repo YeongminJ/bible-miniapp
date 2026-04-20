@@ -1,0 +1,142 @@
+{
+  "traits": {
+    "leadership": "리더십",
+    "faith": "믿음",
+    "wisdom": "지혜",
+    "courage": "용기",
+    "humility": "겸손",
+    "compassion": "공감",
+    "perseverance": "인내",
+    "service": "섬김",
+    "justice": "정의",
+    "loyalty": "충성"
+  },
+  "questions": [
+    {
+      "id": 1,
+      "question": "갑자기 큰 도전이 주어졌을 때, 나의 첫 반응은?",
+      "options": [
+        { "text": "앞장서서 해결책을 제시한다", "weights": { "leadership": 2, "courage": 1 } },
+        { "text": "먼저 조용히 기도하며 하나님의 뜻을 구한다", "weights": { "faith": 2, "humility": 1 } },
+        { "text": "신중히 분석하고 지혜롭게 판단한다", "weights": { "wisdom": 2, "perseverance": 1 } },
+        { "text": "주변 사람들의 어려움부터 살핀다", "weights": { "compassion": 2, "service": 1 } }
+      ]
+    },
+    {
+      "id": 2,
+      "question": "가까운 사람이 실패로 좌절하고 있다. 나는?",
+      "options": [
+        { "text": "옆에서 함께 울어주고 끝까지 위로한다", "weights": { "compassion": 2, "loyalty": 1 } },
+        { "text": "일어설 수 있도록 구체적인 방향을 제시한다", "weights": { "leadership": 2, "wisdom": 1 } },
+        { "text": "함께 기도하며 믿음으로 버티게 돕는다", "weights": { "faith": 2, "service": 1 } },
+        { "text": "내 경험을 나누며 포기하지 않도록 격려한다", "weights": { "perseverance": 2, "courage": 1 } }
+      ]
+    },
+    {
+      "id": 3,
+      "question": "내가 가장 소중히 여기는 가치는?",
+      "options": [
+        { "text": "공의와 정의를 세우는 것", "weights": { "justice": 2, "courage": 1 } },
+        { "text": "사랑과 긍휼로 사람을 품는 것", "weights": { "compassion": 2, "service": 1 } },
+        { "text": "흔들림 없는 믿음과 순종", "weights": { "faith": 2, "humility": 1 } },
+        { "text": "끝까지 성실하게 성장하는 것", "weights": { "perseverance": 2, "wisdom": 1 } }
+      ]
+    },
+    {
+      "id": 4,
+      "question": "리더가 될 기회가 주어졌다. 나의 선택은?",
+      "options": [
+        { "text": "주저 없이 책임지고 팀을 이끈다", "weights": { "leadership": 2, "courage": 1 } },
+        { "text": "부족함을 고백하고 하나님을 의지하며 나아간다", "weights": { "humility": 2, "faith": 1 } },
+        { "text": "앞에 서기보다 섬기는 리더가 되겠다", "weights": { "service": 2, "humility": 1 } },
+        { "text": "팀원의 마음을 살피고 공감하며 이끈다", "weights": { "compassion": 2, "loyalty": 1 } }
+      ]
+    },
+    {
+      "id": 5,
+      "question": "내가 잘못을 저질렀을 때의 모습은?",
+      "options": [
+        { "text": "바로 인정하고 돌이킨다", "weights": { "humility": 2, "faith": 1 } },
+        { "text": "용기 있게 사과하고 바로잡는다", "weights": { "courage": 2, "justice": 1 } },
+        { "text": "원인을 분석하고 다시 성실히 회복한다", "weights": { "perseverance": 2, "wisdom": 1 } },
+        { "text": "주변을 챙기며 같은 실수를 반복하지 않으려 한다", "weights": { "service": 2, "compassion": 1 } }
+      ]
+    },
+    {
+      "id": 6,
+      "question": "내가 가장 자주 듣는 칭찬은?",
+      "options": [
+        { "text": "책임감이 강하고 결단력이 있다", "weights": { "leadership": 2, "justice": 1 } },
+        { "text": "따뜻하고 공감 능력이 뛰어나다", "weights": { "compassion": 2, "service": 1 } },
+        { "text": "묵묵히 끝까지 해낸다", "weights": { "perseverance": 2, "loyalty": 1 } },
+        { "text": "지혜롭게 문제를 풀어낸다", "weights": { "wisdom": 2, "humility": 1 } }
+      ]
+    },
+    {
+      "id": 7,
+      "question": "공동체 안에서 나의 자리는?",
+      "options": [
+        { "text": "방향을 정하고 앞장서 이끄는 자리", "weights": { "leadership": 2, "courage": 1 } },
+        { "text": "조용히 기도하며 지지하는 자리", "weights": { "faith": 2, "humility": 1 } },
+        { "text": "기쁨과 위로를 전하는 자리", "weights": { "compassion": 2, "service": 1 } },
+        { "text": "궂은 일을 묵묵히 감당하는 자리", "weights": { "service": 2, "perseverance": 1 } }
+      ]
+    },
+    {
+      "id": 8,
+      "question": "내 인생의 주제 한 줄을 고른다면?",
+      "options": [
+        { "text": "내가 약할 그때 비로소 강하다", "weights": { "humility": 2, "faith": 1 } },
+        { "text": "두려워 말라, 하나님이 함께하신다", "weights": { "courage": 2, "faith": 1 } },
+        { "text": "네 이웃을 네 몸같이 사랑하라", "weights": { "compassion": 2, "service": 1 } },
+        { "text": "끝까지 달려갈 길을 마치리라", "weights": { "perseverance": 2, "loyalty": 1 } }
+      ]
+    }
+  ],
+  "virtueToTraits": {
+    "순종": ["faith", "humility"],
+    "믿음": ["faith", "courage"],
+    "용기": ["courage", "leadership"],
+    "지혜": ["wisdom"],
+    "인내": ["perseverance", "faith"],
+    "회개": ["humility", "faith"],
+    "사랑": ["compassion", "service"],
+    "겸손": ["humility"],
+    "충성": ["loyalty", "service"],
+    "헌신": ["service", "faith"],
+    "기도": ["faith", "humility"],
+    "소명": ["leadership", "faith"],
+    "정의": ["justice", "courage"],
+    "섬김": ["service", "compassion"],
+    "찬양": ["faith"],
+    "치유": ["compassion"],
+    "리더십": ["leadership"],
+    "선교": ["leadership", "faith"],
+    "예언": ["wisdom", "courage"],
+    "감사": ["faith", "humility"],
+    "신실": ["loyalty", "faith"],
+    "소망": ["faith", "perseverance"],
+    "결단": ["courage", "leadership"],
+    "회복": ["perseverance", "faith"],
+    "절개": ["loyalty", "courage"],
+    "공의": ["justice"],
+    "용서": ["compassion", "humility"],
+    "열심": ["perseverance", "faith"],
+    "변화": ["humility", "faith"],
+    "책임": ["leadership", "loyalty"],
+    "환대": ["service", "compassion"],
+    "분별": ["wisdom"],
+    "동행": ["loyalty", "faith"],
+    "생명": ["compassion"],
+    "존엄": ["justice", "humility"],
+    "탐구": ["wisdom", "perseverance"],
+    "경고": ["justice", "courage"]
+  },
+  "matchPoolIds": [
+    7, 9, 10, 12, 15, 18, 21, 23, 25, 26,
+    31, 32, 36, 37, 39, 40, 42, 43, 48, 51,
+    52, 59, 62, 63, 65, 70, 71, 73, 75, 82,
+    101, 102, 104, 105, 107, 109, 115, 119, 121, 122,
+    123, 127, 130, 131
+  ]
+}

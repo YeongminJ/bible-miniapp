@@ -20,15 +20,17 @@ function App() {
       <Top
         title={
           <Top.TitleParagraph size={22}>
-            <span style={{ fontWeight: 900, letterSpacing: "-1px" }}>오늘의 은혜</span>
+            <span style={{ fontWeight: 900, letterSpacing: "-1px" }}>오늘의 말씀</span>
           </Top.TitleParagraph>
         }
         subtitleBottom={
-          <Top.SubtitleParagraph size={14}>
-            {activeTab === "quiz" && "성경 퀴즈로 말씀을 즐겨보세요"}
-            {activeTab === "prayer" && "상황에 맞는 기도문을 읽어보세요"}
-            {activeTab === "character" && "성경 인물을 만나보세요"}
-          </Top.SubtitleParagraph>
+          <div style={{ marginTop: 3 }}>
+            <Top.SubtitleParagraph size={13}>
+              {activeTab === "quiz" && "성경 퀴즈로 말씀을 즐겨보세요"}
+              {activeTab === "prayer" && "상황에 맞는 기도문을 읽어보세요"}
+              {activeTab === "character" && "성경 인물을 만나보세요"}
+            </Top.SubtitleParagraph>
+          </div>
         }
       />
 
