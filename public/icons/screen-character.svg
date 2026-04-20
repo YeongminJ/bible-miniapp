@@ -1,0 +1,116 @@
+<?xml version="1.0"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 636 1048" width="636" height="1048">
+  <rect width="636" height="1048" fill="#F6F6F9"/>
+  
+  <rect width="636" height="54" fill="#F6F6F9"/>
+  <text x="40" y="34" font-family="'Apple SD Gothic Neo','Pretendard','Noto Sans KR',sans-serif" font-size="20" font-weight="700" fill="#111827">9:41</text>
+  <g fill="#111827" transform="translate(506 18)">
+    <rect x="0" y="8" width="6" height="10" rx="1"/>
+    <rect x="10" y="5" width="6" height="13" rx="1"/>
+    <rect x="20" y="2" width="6" height="16" rx="1"/>
+    <rect x="44" y="4" width="42" height="16" rx="3" fill="none" stroke="#111827" stroke-width="1.5"/>
+    <rect x="46" y="6" width="32" height="12" rx="1" fill="#111827"/>
+  </g>
+
+  
+  <text x="40" y="130" font-family="'Apple SD Gothic Neo','Pretendard','Noto Sans KR',sans-serif" font-size="34" font-weight="900" letter-spacing="-1" fill="#111827">오늘의 말씀</text>
+  <text x="40" y="165" font-family="'Apple SD Gothic Neo','Pretendard','Noto Sans KR',sans-serif" font-size="14" font-weight="500" fill="#6B7280">성경 인물을 만나보세요</text>
+
+
+  <g transform="translate(28 200)">
+    <g>
+      <rect width="282" height="170" rx="20" fill="#FFFFFF"/>
+      <circle cx="141" cy="70" r="40" fill="#FEF3C7"/>
+      <g transform="translate(123 52)">
+        <path fill="#FBBF24" d="M 0,20 L 6,0 L 12,14 L 18,0 L 24,14 L 30,0 L 36,20 Z"/>
+      </g>
+      <text x="141" y="146" font-family="'Apple SD Gothic Neo','Pretendard','Noto Sans KR',sans-serif" font-size="15" font-weight="800" text-anchor="middle" fill="#111827">다윗 · 왕</text>
+    </g>
+    <g transform="translate(298 0)">
+      <rect width="282" height="170" rx="20" fill="#FFFFFF"/>
+      <circle cx="141" cy="70" r="40" fill="#ECFDF5"/>
+      <g transform="translate(127 50)" fill="#0D9488">
+        <path d="M 14,0 C 18,0 28,4 28,14 C 28,24 18,30 14,30 C 10,30 0,24 0,14 C 0,4 10,0 14,0 Z"/>
+      </g>
+      <text x="141" y="146" font-family="'Apple SD Gothic Neo','Pretendard','Noto Sans KR',sans-serif" font-size="15" font-weight="800" text-anchor="middle" fill="#111827">노아 · 의인</text>
+    </g>
+    <g transform="translate(0 190)">
+      <rect width="282" height="170" rx="20" fill="#FFFFFF"/>
+      <circle cx="141" cy="70" r="40" fill="#FEE2E2"/>
+      <text x="141" y="146" font-family="'Apple SD Gothic Neo','Pretendard','Noto Sans KR',sans-serif" font-size="15" font-weight="800" text-anchor="middle" fill="#111827">모세 · 지도자</text>
+    </g>
+    <g transform="translate(298 190)">
+      <rect width="282" height="170" rx="20" fill="#FFFFFF"/>
+      <circle cx="141" cy="70" r="40" fill="#DBEAFE"/>
+      <text x="141" y="146" font-family="'Apple SD Gothic Neo','Pretendard','Noto Sans KR',sans-serif" font-size="15" font-weight="800" text-anchor="middle" fill="#111827">아브라함 · 믿음</text>
+    </g>
+  </g>
+
+  
+    <rect x="0" y="948" width="636" height="100" fill="rgba(255,255,255,0.95)"/>
+    <line x1="0" y1="948" x2="636" y2="948" stroke="#F3F4F6"/>
+    
+        
+        
+  <g transform="translate(92 968)" fill="#9CA3AF">
+    <rect x="0" y="0" width="28" height="20" rx="2"/>
+    <rect x="13" y="2" width="2" height="16" fill="#F6F6F9"/>
+  </g>
+
+        <text x="106" y="1022" font-family="'Apple SD Gothic Neo','Pretendard','Noto Sans KR',sans-serif" font-size="13" font-weight="600" text-anchor="middle" fill="#9CA3AF">퀴즈</text>
+      
+        
+        
+  <g transform="translate(318 978)" fill="#9CA3AF">
+    <path d="M -10,-10 L -4,4 C -3,7 -5,9 -8,9 L -12,9 C -14,9 -16,7 -15,5 Z"/>
+    <path d="M 10,-10 L 4,4 C 3,7 5,9 8,9 L 12,9 C 14,9 16,7 15,5 Z"/>
+  </g>
+
+        <text x="318" y="1022" font-family="'Apple SD Gothic Neo','Pretendard','Noto Sans KR',sans-serif" font-size="13" font-weight="600" text-anchor="middle" fill="#9CA3AF">기도</text>
+      
+        <rect x="518" y="950" width="24" height="4" rx="2" fill="#0D9488"/>
+        
+  <g transform="translate(530 978)" fill="#0D9488">
+    <circle cx="0" cy="-6" r="6"/>
+    <path d="M -12,10 C -12,2 -6,-2 0,-2 C 6,-2 12,2 12,10 Z"/>
+  </g>
+
+        <text x="530" y="1022" font-family="'Apple SD Gothic Neo','Pretendard','Noto Sans KR',sans-serif" font-size="13" font-weight="900" text-anchor="middle" fill="#0D9488">인물</text>
+      
+  
+
+  
+    <rect x="0" y="0" width="636" height="1048" fill="#000" opacity="0.35"/>
+    <rect x="0" y="448" width="636" height="600" rx="28" fill="#FFFFFF"/>
+    <rect x="296" y="460" width="44" height="5" rx="2.5" fill="#D1D5DB"/>
+    <g transform="translate(0 482)">
+    <g>
+      <circle cx="318" cy="64" r="56" fill="#FEF3C7"/>
+      <g transform="translate(296 46)">
+        <path fill="#FBBF24" d="M 0,24 L 8,0 L 16,18 L 22,0 L 28,18 L 36,0 L 44,24 Z"/>
+      </g>
+      <text x="318" y="158" font-family="'Apple SD Gothic Neo','Pretendard','Noto Sans KR',sans-serif" font-size="28" font-weight="900" text-anchor="middle" fill="#111827">다윗</text>
+      <text x="318" y="186" font-family="'Apple SD Gothic Neo','Pretendard','Noto Sans KR',sans-serif" font-size="13" font-weight="600" text-anchor="middle" fill="#6B7280">이스라엘의 두 번째 왕 · 목자 출신</text>
+
+      <g transform="translate(36 210)">
+        <rect width="564" height="96" rx="16" fill="#F9FAFB"/>
+        <text x="20" y="30" font-family="'Apple SD Gothic Neo','Pretendard','Noto Sans KR',sans-serif" font-size="11" font-weight="800" fill="#0D9488" letter-spacing="1">핵심 이야기</text>
+        <text x="20" y="58" font-family="'Apple SD Gothic Neo','Pretendard','Noto Sans KR',sans-serif" font-size="14" fill="#374151">골리앗을 물맷돌로 쓰러뜨린 소년 목자,</text>
+        <text x="20" y="80" font-family="'Apple SD Gothic Neo','Pretendard','Noto Sans KR',sans-serif" font-size="14" fill="#374151">주님의 마음에 합한 사람이었어요.</text>
+      </g>
+
+      <g transform="translate(36 322)">
+        <rect width="564" height="96" rx="16" fill="#F9FAFB"/>
+        <text x="20" y="30" font-family="'Apple SD Gothic Neo','Pretendard','Noto Sans KR',sans-serif" font-size="11" font-weight="800" fill="#0D9488" letter-spacing="1">대표 말씀 · 시편 23:1</text>
+        <text x="20" y="58" font-family="'Apple SD Gothic Neo','Pretendard','Noto Sans KR',sans-serif" font-size="14" fill="#374151">"여호와는 나의 목자시니 내게</text>
+        <text x="20" y="80" font-family="'Apple SD Gothic Neo','Pretendard','Noto Sans KR',sans-serif" font-size="14" fill="#374151">부족함이 없으리로다"</text>
+      </g>
+
+      <g transform="translate(36 436)">
+        <rect width="564" height="52" rx="14" fill="#0D9488"/>
+        <text x="282" y="34" font-family="'Apple SD Gothic Neo','Pretendard','Noto Sans KR',sans-serif" font-size="16" font-weight="800" text-anchor="middle" fill="#FFFFFF">이 인물 퀴즈 풀기</text>
+      </g>
+    </g>
+  </g>
+  
+</svg>

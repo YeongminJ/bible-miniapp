@@ -1,5 +1,8 @@
 import { useState, useEffect } from "react";
 import VerseAudio from "./VerseAudio";
+import { showInterstitialAd } from "../lib/ad";
+
+const MAX_LIVES = 2;
 
 interface Quiz {
   id: number;
@@ -23,6 +26,8 @@ export default function QuizTab() {
   const [score, setScore] = useState(0);
   const [finished, setFinished] = useState(false);
   const [dailyQuizzes, setDailyQuizzes] = useState<Quiz[]>([]);
+  const [lives, setLives] = useState(MAX_LIVES);
+  const [adLoading, setAdLoading] = useState(false);
 
   useEffect(() => {
     fetch(`${import.meta.env.BASE_URL}data/quizzes.json`)
@@ -42,6 +47,7 @@ export default function QuizTab() {
     setSelected(null);
     setScore(0);
     setFinished(false);
+    setLives(MAX_LIVES);
   };
 
   // 난이도 선택 화면
@@ -120,7 +126,16 @@ export default function QuizTab() {
       {/* 상단 바 */}
       <div style={styles.topBar}>
         <button style={styles.backLink} onClick={() => setDifficulty(null)}>← 난이도</button>
-        <span style={styles.diffBadge}>{difficulty}</span>
+        <div style={styles.topRight}>
+          <span style={styles.livesBadge} aria-label={`남은 목숨 ${lives}개`}>
+            {Array.from({ length: MAX_LIVES }, (_, i) => (
+              <span key={i} style={{ opacity: i < lives ? 1 : 0.25, filter: i < lives ? "none" : "grayscale(1)" }}>
+                ❤️
+              </span>
+            ))}
+          </span>
+          <span style={styles.diffBadge}>{difficulty}</span>
+        </div>
       </div>
 
       {/* 진행 바 */}
@@ -178,7 +193,11 @@ export default function QuizTab() {
               onClick={() => {
                 if (selected !== null) return;
                 setSelected(i);
-                if (i === quiz.answer) setScore((s) => s + 1);
+                if (i === quiz.answer) {
+                  setScore((s) => s + 1);
+                } else {
+                  setLives((l) => Math.max(0, l - 1));
+                }
               }}
             >
               <span style={styles.optionLabel}>{String.fromCharCode(65 + i)}</span>
@@ -197,19 +216,40 @@ export default function QuizTab() {
           <div style={{ marginTop: "12px" }}>
             <VerseAudio reference={quiz.reference} verseText={quiz.verseText} />
           </div>
-          <button
-            style={styles.nextButton}
-            onClick={() => {
-              if (currentIndex < 4) {
-                setCurrentIndex((i) => i + 1);
-                setSelected(null);
-              } else {
-                setFinished(true);
-              }
-            }}
-          >
-            {currentIndex < 4 ? "다음 문제" : "결과 보기"}
-          </button>
+          {lives === 0 ? (
+            <button
+              style={{ ...styles.nextButton, ...styles.adButton, opacity: adLoading ? 0.7 : 1 }}
+              disabled={adLoading}
+              onClick={async () => {
+                setAdLoading(true);
+                await showInterstitialAd();
+                setAdLoading(false);
+                setLives(MAX_LIVES);
+                if (currentIndex < 4) {
+                  setCurrentIndex((i) => i + 1);
+                  setSelected(null);
+                } else {
+                  setFinished(true);
+                }
+              }}
+            >
+              {adLoading ? "광고 준비 중..." : "📺 광고 보고 계속하기"}
+            </button>
+          ) : (
+            <button
+              style={styles.nextButton}
+              onClick={() => {
+                if (currentIndex < 4) {
+                  setCurrentIndex((i) => i + 1);
+                  setSelected(null);
+                } else {
+                  setFinished(true);
+                }
+              }}
+            >
+              {currentIndex < 4 ? "다음 문제" : "결과 보기"}
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -235,8 +275,17 @@ const styles: Record<string, React.CSSProperties> = {
   levelCount: { fontSize: "13px", opacity: 0.7 },
   // Top bar
   topBar: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" },
+  topRight: { display: "flex", alignItems: "center", gap: "8px" },
   backLink: { fontSize: "14px", fontWeight: 600, color: "#0D9488", background: "none", border: "none", cursor: "pointer" },
   diffBadge: { fontSize: "12px", fontWeight: 700, padding: "4px 12px", borderRadius: "100px", backgroundColor: "#F0FDFA", color: "#0D9488" },
+  livesBadge: {
+    display: "inline-flex", alignItems: "center", gap: "2px",
+    padding: "4px 10px", borderRadius: "100px", backgroundColor: "#FEF2F2",
+    fontSize: "14px", lineHeight: 1,
+  },
+  adButton: {
+    backgroundColor: "#F59E0B",
+  },
   // Progress
   progressBar: { display: "flex", gap: "8px", marginBottom: "24px" },
   progressDot: { flex: 1, height: "4px", borderRadius: "2px" },

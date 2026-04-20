@@ -1,0 +1,106 @@
+<?xml version="1.0"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 636 1048" width="636" height="1048">
+  <rect width="636" height="1048" fill="#F6F6F9"/>
+  
+  <rect width="636" height="54" fill="#F6F6F9"/>
+  <text x="40" y="34" font-family="'Apple SD Gothic Neo','Pretendard','Noto Sans KR',sans-serif" font-size="20" font-weight="700" fill="#111827">9:41</text>
+  <g fill="#111827" transform="translate(506 18)">
+    <rect x="0" y="8" width="6" height="10" rx="1"/>
+    <rect x="10" y="5" width="6" height="13" rx="1"/>
+    <rect x="20" y="2" width="6" height="16" rx="1"/>
+    <rect x="44" y="4" width="42" height="16" rx="3" fill="none" stroke="#111827" stroke-width="1.5"/>
+    <rect x="46" y="6" width="32" height="12" rx="1" fill="#111827"/>
+  </g>
+
+  
+  <text x="40" y="130" font-family="'Apple SD Gothic Neo','Pretendard','Noto Sans KR',sans-serif" font-size="34" font-weight="900" letter-spacing="-1" fill="#111827">오늘의 말씀</text>
+  <text x="40" y="165" font-family="'Apple SD Gothic Neo','Pretendard','Noto Sans KR',sans-serif" font-size="14" font-weight="500" fill="#6B7280">성경 퀴즈로 말씀을 즐겨보세요</text>
+
+
+  <g transform="translate(40 200)">
+    <text font-family="'Apple SD Gothic Neo','Pretendard','Noto Sans KR',sans-serif" font-size="13" font-weight="700" fill="#0D9488">문제 3 / 10</text>
+    <rect x="0" y="14" width="556" height="8" rx="4" fill="#F3F4F6"/>
+    <rect x="0" y="14" width="166.79999999999998" height="8" rx="4" fill="#0D9488"/>
+  </g>
+
+  <g transform="translate(28 260)">
+    <rect width="580" height="320" rx="20" fill="#FFFFFF"/>
+    <text x="24" y="40" font-family="'Apple SD Gothic Neo','Pretendard','Noto Sans KR',sans-serif" font-size="12" font-weight="800" fill="#0D9488" letter-spacing="1">구약 · 창세기</text>
+    <text x="24" y="86" font-family="'Apple SD Gothic Neo','Pretendard','Noto Sans KR',sans-serif" font-size="19" font-weight="800" fill="#111827">하나님이 노아에게 방주를</text>
+    <text x="24" y="116" font-family="'Apple SD Gothic Neo','Pretendard','Noto Sans KR',sans-serif" font-size="19" font-weight="800" fill="#111827">만들라 명하신 이유는?</text>
+
+    <g transform="translate(24 164)">
+      <rect width="532" height="46" rx="12" fill="#F3F4F6"/>
+      <text x="20" y="30" font-family="'Apple SD Gothic Neo','Pretendard','Noto Sans KR',sans-serif" font-size="15" fill="#374151">1. 방주를 자랑하기 위해</text>
+    </g>
+    <g transform="translate(24 218)">
+      <rect width="532" height="46" rx="12" fill="#ECFDF5" stroke="#0D9488" stroke-width="2"/>
+      <text x="20" y="30" font-family="'Apple SD Gothic Neo','Pretendard','Noto Sans KR',sans-serif" font-size="15" font-weight="700" fill="#0D9488">2. 홍수 심판에서 가족 구원</text>
+    </g>
+    <g transform="translate(24 272)">
+      <rect width="532" height="32" rx="10" fill="#F3F4F6"/>
+      <text x="20" y="22" font-family="'Apple SD Gothic Neo','Pretendard','Noto Sans KR',sans-serif" font-size="14" fill="#374151">3. 동물을 관리하기 위해</text>
+    </g>
+  </g>
+
+  
+    <rect x="0" y="948" width="636" height="100" fill="rgba(255,255,255,0.95)"/>
+    <line x1="0" y1="948" x2="636" y2="948" stroke="#F3F4F6"/>
+    
+        <rect x="94" y="950" width="24" height="4" rx="2" fill="#0D9488"/>
+        
+  <g transform="translate(92 968)" fill="#0D9488">
+    <rect x="0" y="0" width="28" height="20" rx="2"/>
+    <rect x="13" y="2" width="2" height="16" fill="#F6F6F9"/>
+  </g>
+
+        <text x="106" y="1022" font-family="'Apple SD Gothic Neo','Pretendard','Noto Sans KR',sans-serif" font-size="13" font-weight="900" text-anchor="middle" fill="#0D9488">퀴즈</text>
+      
+        
+        
+  <g transform="translate(318 978)" fill="#9CA3AF">
+    <path d="M -10,-10 L -4,4 C -3,7 -5,9 -8,9 L -12,9 C -14,9 -16,7 -15,5 Z"/>
+    <path d="M 10,-10 L 4,4 C 3,7 5,9 8,9 L 12,9 C 14,9 16,7 15,5 Z"/>
+  </g>
+
+        <text x="318" y="1022" font-family="'Apple SD Gothic Neo','Pretendard','Noto Sans KR',sans-serif" font-size="13" font-weight="600" text-anchor="middle" fill="#9CA3AF">기도</text>
+      
+        
+        
+  <g transform="translate(530 978)" fill="#9CA3AF">
+    <circle cx="0" cy="-6" r="6"/>
+    <path d="M -12,10 C -12,2 -6,-2 0,-2 C 6,-2 12,2 12,10 Z"/>
+  </g>
+
+        <text x="530" y="1022" font-family="'Apple SD Gothic Neo','Pretendard','Noto Sans KR',sans-serif" font-size="13" font-weight="600" text-anchor="middle" fill="#9CA3AF">인물</text>
+      
+  
+
+  
+    <rect x="0" y="0" width="636" height="1048" fill="#000" opacity="0.35"/>
+    <rect x="0" y="578" width="636" height="470" rx="28" fill="#FFFFFF"/>
+    <rect x="296" y="590" width="44" height="5" rx="2.5" fill="#D1D5DB"/>
+    <g transform="translate(0 612)">
+    <g transform="translate(40 0)">
+      <circle cx="28" cy="28" r="28" fill="#ECFDF5"/>
+      <path d="M 18,30 L 26,38 L 40,22" stroke="#0D9488" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+      <text x="76" y="24" font-family="'Apple SD Gothic Neo','Pretendard','Noto Sans KR',sans-serif" font-size="14" font-weight="800" fill="#0D9488" letter-spacing="1">정답입니다!</text>
+      <text x="76" y="52" font-family="'Apple SD Gothic Neo','Pretendard','Noto Sans KR',sans-serif" font-size="22" font-weight="900" fill="#111827">+10점 획득</text>
+
+      <g transform="translate(0 80)">
+        <rect width="556" height="170" rx="16" fill="#F9FAFB"/>
+        <text x="20" y="30" font-family="'Apple SD Gothic Neo','Pretendard','Noto Sans KR',sans-serif" font-size="12" font-weight="800" fill="#0D9488" letter-spacing="1">관련 말씀 · 창세기 6:13-14</text>
+        <text x="20" y="62" font-family="'Apple SD Gothic Neo','Pretendard','Noto Sans KR',sans-serif" font-size="14" fill="#374151">"내가 한 끝 날이 내 앞에 이르렀으니…</text>
+        <text x="20" y="86" font-family="'Apple SD Gothic Neo','Pretendard','Noto Sans KR',sans-serif" font-size="14" fill="#374151">너는 잣나무로 너를 위하여 방주를 지으라"</text>
+        <text x="20" y="124" font-family="'Apple SD Gothic Neo','Pretendard','Noto Sans KR',sans-serif" font-size="13" fill="#6B7280">해설: 하나님은 의로운 노아의 가정을</text>
+        <text x="20" y="146" font-family="'Apple SD Gothic Neo','Pretendard','Noto Sans KR',sans-serif" font-size="13" fill="#6B7280">홍수 심판에서 구원하셨어요.</text>
+      </g>
+
+      <g transform="translate(0 272)">
+        <rect width="556" height="56" rx="14" fill="#0D9488"/>
+        <text x="278" y="36" font-family="'Apple SD Gothic Neo','Pretendard','Noto Sans KR',sans-serif" font-size="17" font-weight="800" text-anchor="middle" fill="#FFFFFF">다음 문제</text>
+      </g>
+    </g>
+  </g>
+  
+</svg>

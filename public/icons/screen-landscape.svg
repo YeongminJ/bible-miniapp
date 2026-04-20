@@ -1,0 +1,60 @@
+<?xml version="1.0"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1504 741" width="1504" height="741">
+  <defs>
+    <linearGradient id="bg2" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#14B8A6"/>
+      <stop offset="100%" stop-color="#0F766E"/>
+    </linearGradient>
+  </defs>
+  <rect width="1504" height="741" fill="url(#bg2)"/>
+
+  <text x="752" y="100" font-family="'Apple SD Gothic Neo','Pretendard','Noto Sans KR',sans-serif" font-size="60" font-weight="900" text-anchor="middle" fill="#FFFFFF" letter-spacing="-2">오늘의 말씀</text>
+  <text x="752" y="148" font-family="'Apple SD Gothic Neo','Pretendard','Noto Sans KR',sans-serif" font-size="22" font-weight="500" text-anchor="middle" fill="#FFFFFF" opacity="0.88">성경 퀴즈 · 맞춤 기도 · 성경 인물 — 하루 5분의 은혜</text>
+
+  
+      <g transform="translate(40 200)">
+        <rect width="474.6666666666667" height="501" rx="28" fill="#FFFFFF" opacity="0.96"/>
+      </g>
+      <rect x="68" y="232" width="418.6666666666667" height="130" rx="22" fill="#FEF3C7"/>
+      
+        <g transform="translate(237.33333333333337 262)" fill="#FBBF24">
+          <rect x="0" y="0" width="80" height="64" rx="4"/>
+          <rect x="38" y="4" width="4" height="56" fill="#FFFFFF"/>
+        </g>
+      
+      
+      <text x="277.33333333333337" y="420" font-family="'Apple SD Gothic Neo','Pretendard','Noto Sans KR',sans-serif" font-size="34" font-weight="900" text-anchor="middle" fill="#0F766E">성경 퀴즈</text>
+      <text x="277.33333333333337" y="470" font-family="'Apple SD Gothic Neo','Pretendard','Noto Sans KR',sans-serif" font-size="20" font-weight="500" text-anchor="middle" fill="#374151">500문제로</text>
+      <text x="277.33333333333337" y="498" font-family="'Apple SD Gothic Neo','Pretendard','Noto Sans KR',sans-serif" font-size="20" font-weight="500" text-anchor="middle" fill="#374151">말씀을 재미있게</text>
+    
+      <g transform="translate(534.6666666666667 200)">
+        <rect width="474.6666666666667" height="501" rx="28" fill="#FFFFFF" opacity="0.96"/>
+      </g>
+      <rect x="562.6666666666667" y="232" width="418.6666666666667" height="130" rx="22" fill="#DBEAFE"/>
+      
+      
+        <g transform="translate(772.0000000000001 292)" fill="#0D9488">
+          <path d="M -20,-30 L -6,8 C -4,14 -9,20 -15,20 L -25,20 C -30,20 -34,15 -32,10 Z"/>
+          <path d="M 20,-30 L 6,8 C 4,14 9,20 15,20 L 25,20 C 30,20 34,15 32,10 Z"/>
+        </g>
+      
+      <text x="772.0000000000001" y="420" font-family="'Apple SD Gothic Neo','Pretendard','Noto Sans KR',sans-serif" font-size="34" font-weight="900" text-anchor="middle" fill="#0F766E">맞춤 기도</text>
+      <text x="772.0000000000001" y="470" font-family="'Apple SD Gothic Neo','Pretendard','Noto Sans KR',sans-serif" font-size="20" font-weight="500" text-anchor="middle" fill="#374151">내 삶에 꼭 맞는</text>
+      <text x="772.0000000000001" y="498" font-family="'Apple SD Gothic Neo','Pretendard','Noto Sans KR',sans-serif" font-size="20" font-weight="500" text-anchor="middle" fill="#374151">387개 기도문</text>
+    
+      <g transform="translate(1029.3333333333335 200)">
+        <rect width="474.6666666666667" height="501" rx="28" fill="#FFFFFF" opacity="0.96"/>
+      </g>
+      <rect x="1057.3333333333335" y="232" width="418.6666666666667" height="130" rx="22" fill="#FCE7F3"/>
+      
+      
+      
+        <g transform="translate(1242.6666666666667 262)">
+          <circle cx="24" cy="20" r="18" fill="#0D9488"/>
+          <path d="M 0,64 C 0,44 10,34 24,34 C 38,34 48,44 48,64 Z" fill="#0D9488"/>
+        </g>
+      <text x="1266.6666666666667" y="420" font-family="'Apple SD Gothic Neo','Pretendard','Noto Sans KR',sans-serif" font-size="34" font-weight="900" text-anchor="middle" fill="#0F766E">성경 인물</text>
+      <text x="1266.6666666666667" y="470" font-family="'Apple SD Gothic Neo','Pretendard','Noto Sans KR',sans-serif" font-size="20" font-weight="500" text-anchor="middle" fill="#374151">인물의 이야기와</text>
+      <text x="1266.6666666666667" y="498" font-family="'Apple SD Gothic Neo','Pretendard','Noto Sans KR',sans-serif" font-size="20" font-weight="500" text-anchor="middle" fill="#374151">대표 말씀 함께</text>
+    
+</svg>

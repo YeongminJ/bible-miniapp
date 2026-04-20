@@ -5,7 +5,7 @@ export default defineConfig({
   brand: {
     displayName: "오늘의 말씀",
     primaryColor: "#0D9488",
-    icon: "./public/icons/logo-1024.png",
+    icon: "./public/icons/logo-600.png",
   },
   web: {
     host: "0.0.0.0",

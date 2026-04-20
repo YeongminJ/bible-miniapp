@@ -1,0 +1,108 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1932 828" width="1932" height="828">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#14B8A6"/>
+      <stop offset="60%" stop-color="#0D9488"/>
+      <stop offset="100%" stop-color="#0F766E"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.25" cy="0.5" r="0.55">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.32"/>
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="cross" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#E2E8F0"/>
+    </linearGradient>
+    <linearGradient id="ray" x1="0.5" y1="0" x2="0.5" y2="1">
+      <stop offset="0%" stop-color="#FEF3C7" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#FEF3C7" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="badge" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FEF3C7"/>
+      <stop offset="100%" stop-color="#FDE68A"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 배경 -->
+  <rect width="1932" height="828" fill="url(#bg)"/>
+  <ellipse cx="500" cy="414" rx="620" ry="520" fill="url(#glow)"/>
+
+  <!-- 배경 빛줄기 (왼쪽 십자가 뒤) -->
+  <g transform="translate(500 414)" opacity="0.6">
+    <polygon points="0,-380 -28,380 28,380" fill="url(#ray)"/>
+    <polygon points="0,-380 -28,380 28,380" fill="url(#ray)" transform="rotate(28)"/>
+    <polygon points="0,-380 -28,380 28,380" fill="url(#ray)" transform="rotate(-28)"/>
+    <polygon points="0,-380 -28,380 28,380" fill="url(#ray)" transform="rotate(56)"/>
+    <polygon points="0,-380 -28,380 28,380" fill="url(#ray)" transform="rotate(-56)"/>
+  </g>
+
+  <!-- 왼쪽 십자가 -->
+  <g fill="url(#cross)">
+    <rect x="460" y="180" width="80" height="468" rx="18"/>
+    <rect x="310" y="340" width="380" height="80" rx="18"/>
+  </g>
+
+  <!-- 오른쪽 텍스트 블록 -->
+  <g fill="#FFFFFF" font-family="'SF Pro Display', 'Helvetica Neue', 'Apple SD Gothic Neo', sans-serif">
+    <!-- 앱 이름 -->
+    <text x="900" y="330" font-size="144" font-weight="900" letter-spacing="-4">오늘의 말씀</text>
+    <!-- 서브 카피 -->
+    <text x="904" y="420" font-size="42" font-weight="500" opacity="0.88" letter-spacing="-0.5">
+      성경 말씀과 함께하는 매일의 은혜
+    </text>
+  </g>
+
+  <!-- 기능 뱃지 3개 -->
+  <g transform="translate(904 530)">
+    <!-- 📖 퀴즈 -->
+    <g transform="translate(0 0)">
+      <rect x="0" y="0" width="280" height="110" rx="55" fill="#FFFFFF" fill-opacity="0.14" stroke="#FFFFFF" stroke-opacity="0.35" stroke-width="2"/>
+      <g transform="translate(62 55)">
+        <circle r="34" fill="url(#badge)"/>
+        <g transform="scale(1.78) translate(-18 -18)">
+          <path fill="#269" d="M32 7H4c-2.209 0-4 1.791-4 4v15c0 2.209 1.791 4 4 4h11.416c.52.596 1.477 1 2.584 1s2.065-.404 2.584-1H32c2.209 0 4-1.791 4-4V11c0-2.209-1.791-4-4-4z"/>
+          <path fill="#292F33" d="M20 27c0 1.104-.896 2-2 2s-2-.896-2-2V9c0-1.104.896-2 2-2s2 .896 2 2v18z"/>
+          <path fill="#99AAB5" d="M18 26c0 1.104-.896 2-2 2H4c-1.104 0-2-.896-2-2V8c0-1.104.896-2 2-2h12c1.104 0 2 .896 2 2v18z"/>
+          <path fill="#E1E8ED" d="M18 26c-.999-1.998-3.657-2-4-2-2 0-5 2-8 2-1 0-2-.896-2-2V8c0-1.104 1-2 2-2 3.255 0 6-2 8-2 3 0 4 1.896 4 3v19z"/>
+          <path fill="#99AAB5" d="M34 26c0 1.104-.896 2-2 2H20c-1.104 0-2-.896-2-2V8c0-1.104.896-2 2-2h12c1.104 0 2 .896 2 2v18z"/>
+          <path fill="#CCD6DD" d="M18 26c.999-1.998 3.657-2 4-2 2 0 5 2 8 2 1 0 2-.896 2-2V8c0-1.104-1-2-2-2-3.256 0-6-2-8-2-3 0-4 1.896-4 3v19z"/>
+        </g>
+      </g>
+      <text x="180" y="68" fill="#FFFFFF" font-family="'SF Pro Display', 'Apple SD Gothic Neo', sans-serif" font-size="36" font-weight="800" text-anchor="middle">퀴즈</text>
+    </g>
+    <!-- 🙏 기도 -->
+    <g transform="translate(310 0)">
+      <rect x="0" y="0" width="280" height="110" rx="55" fill="#FFFFFF" fill-opacity="0.14" stroke="#FFFFFF" stroke-opacity="0.35" stroke-width="2"/>
+      <g transform="translate(62 55) scale(1.88) translate(-18 -18)">
+        <path fill="#50A5E6" d="M30 22c-3 0-6.688 7.094-7 10-.421 3.915 2 4 2 4h11V26s-3.438-4-6-4z"/>
+        <path fill="#F9CA55" d="M20.086 0c1.181 0 2.138.957 2.138 2.138 0 .789.668 10.824.668 10.824L17.948 18V2.138C17.948.957 18.905 0 20.086 0z"/>
+        <path fill="#FFDC5D" d="M18.875 4.323c0-1.099.852-1.989 1.903-1.989 1.051 0 1.903.891 1.903 1.989 0 0 .535 5.942 1.192 9.37.878 1.866 1.369 4.682 1.261 6.248.054.398 5.625 5.006 5.625 5.006-.281 1.813-2.259 6.155-4.759 8.159l-3.521-2.924c-2.885-.404-4.458-3.331-4.458-4.264 0-2.984.854-21.595.854-21.595z"/>
+        <path fill="#50A5E6" d="M6 22c3 0 6.688 7.094 7 10 .421 3.915-2 4-2 4H0V26s3.438-4 6-4z"/>
+        <path fill="#F9CA55" d="M16.061.011c-1.266-.127-2.333.864-2.333 2.103 0 .78-.184 10.319-.184 10.319L17.895 18l.062-15.765c0-1.106-.795-2.114-1.896-2.224z"/>
+        <path fill="#FFDC5D" d="M17.125 4.323c0-1.099-.852-1.989-1.903-1.989-1.051 0-1.903.891-1.903 1.989 0 0-.535 5.942-1.192 9.37-.878 1.866-1.369 4.682-1.261 6.248-.054.398-5.625 5.006-5.625 5.006C5.522 26.76 7.5 31.102 10 33.106l3.521-2.924c2.885-.404 4.458-3.331 4.458-4.264 0-2.984-.854-21.595-.854-21.595z"/>
+      </g>
+      <text x="180" y="68" fill="#FFFFFF" font-family="'SF Pro Display', 'Apple SD Gothic Neo', sans-serif" font-size="36" font-weight="800" text-anchor="middle">기도</text>
+    </g>
+    <!-- 👤 인물 -->
+    <g transform="translate(620 0)">
+      <rect x="0" y="0" width="280" height="110" rx="55" fill="#FFFFFF" fill-opacity="0.14" stroke="#FFFFFF" stroke-opacity="0.35" stroke-width="2"/>
+      <g transform="translate(62 55) scale(1.88) translate(-18 -18)">
+        <path fill="#269" d="M24 26.799v-2.566c2-1.348 4.08-3.779 4.703-6.896.186.103.206.17.413.17.991 0 1.709-1.287 1.709-2.873 0-1.562-.823-2.827-1.794-2.865.187-.674.293-1.577.293-2.735C29.324 5.168 26 .527 18.541.527c-6.629 0-10.777 4.641-10.777 8.507 0 1.123.069 2.043.188 2.755-.911.137-1.629 1.352-1.629 2.845 0 1.587.804 2.873 1.796 2.873.206 0 .025-.067.209-.17C8.952 20.453 11 22.885 13 24.232v2.414c-5 .645-12 3.437-12 6.23v1.061C1 35 2.076 35 3.137 35h29.725C33.924 35 35 35 35 33.938v-1.061c0-2.615-6-5.225-11-6.078z"/>
+      </g>
+      <text x="180" y="68" fill="#FFFFFF" font-family="'SF Pro Display', 'Apple SD Gothic Neo', sans-serif" font-size="36" font-weight="800" text-anchor="middle">인물</text>
+    </g>
+  </g>
+
+  <!-- 하단 반짝임 -->
+  <g fill="#FEF3C7">
+    <g transform="translate(180 700)" opacity="0.7">
+      <path d="M0,-16 L3,-3 L16,0 L3,3 L0,16 L-3,3 L-16,0 L-3,-3 Z"/>
+    </g>
+    <g transform="translate(1820 150)" opacity="0.55">
+      <path d="M0,-14 L3,-3 L14,0 L3,3 L0,14 L-3,3 L-14,0 L-3,-3 Z"/>
+    </g>
+    <g transform="translate(1760 720)" opacity="0.4">
+      <path d="M0,-10 L2,-2 L10,0 L2,2 L0,10 L-2,2 L-10,0 L-2,-2 Z"/>
+    </g>
+  </g>
+</svg>
