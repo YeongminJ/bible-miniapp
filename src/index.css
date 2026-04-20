@@ -8,12 +8,17 @@
   -webkit-font-smoothing: antialiased;
 }
 
+html {
+  height: 100%;
+}
+
 body {
   margin: 0;
   min-width: 320px;
-  min-height: 100vh;
+  min-height: 100dvh;
   background-color: #F6F6F9;
   color: #1F2937;
+  overflow: hidden;
 }
 
 ::-webkit-scrollbar {

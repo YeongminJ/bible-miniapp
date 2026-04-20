@@ -70,14 +70,15 @@ function App() {
 
 const styles: Record<string, React.CSSProperties> = {
   app: {
-    minHeight: "100vh",
+    minHeight: "100dvh",
     backgroundColor: "#F6F6F9",
     display: "flex",
     flexDirection: "column",
+    paddingTop: "env(safe-area-inset-top, 0px)",
   },
   content: {
     flex: 1,
-    paddingBottom: "80px",
+    paddingBottom: "calc(70px + env(safe-area-inset-bottom, 20px))",
     overflowY: "auto",
   },
   tabBar: {
@@ -91,7 +92,7 @@ const styles: Record<string, React.CSSProperties> = {
     backdropFilter: "blur(20px)",
     borderTop: "1px solid #F3F4F6",
     paddingTop: "8px",
-    paddingBottom: "env(safe-area-inset-bottom, 20px)",
+    paddingBottom: "env(safe-area-inset-bottom, 12px)",
     zIndex: 100,
   },
   tab: {
