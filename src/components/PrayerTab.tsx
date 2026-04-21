@@ -3,6 +3,8 @@ import VerseAudio from "./VerseAudio";
 import ReadAlongMode from "./ReadAlongMode";
 import ProfileSelector from "./ProfileSelector";
 import { loadProfile, matchScore, type UserProfile } from "../lib/profile";
+import { useUser } from "../lib/UserContext";
+import { saveUserData } from "../lib/userStore";
 
 interface Prayer {
   id: number;
@@ -41,7 +43,14 @@ export default function PrayerTab() {
   );
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [readAlongPrayer, setReadAlongPrayer] = useState<Prayer | null>(null);
-  const [readIds, setReadIds] = useState<Set<number>>(getReadPrayers());
+  const { data: userData, update: updateUser } = useUser();
+  const [readIds, setReadIds] = useState<Set<number>>(() => {
+    const local = getReadPrayers();
+    if (userData?.readPrayers?.length) {
+      userData.readPrayers.forEach((id) => local.add(id));
+    }
+    return local;
+  });
   const [showReadOnly, setShowReadOnly] = useState(false);
 
   useEffect(() => {
@@ -85,7 +94,9 @@ export default function PrayerTab() {
 
   const handleReadComplete = (prayerId: number) => {
     saveReadPrayer(prayerId);
-    setReadIds(getReadPrayers());
+    const updated = getReadPrayers();
+    setReadIds(updated);
+    saveUserData({ readPrayers: [...updated] });
     setReadAlongPrayer(null);
   };
 

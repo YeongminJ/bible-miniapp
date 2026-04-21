@@ -3,6 +3,7 @@ import { SafeAreaInsets } from "@apps-in-toss/web-framework";
 import QuizTab from "./components/QuizTab";
 import PrayerTab from "./components/PrayerTab";
 import CharacterTab from "./components/CharacterTab";
+import { UserProvider, useUser } from "./lib/UserContext";
 
 type Tab = "quiz" | "prayer" | "character";
 
@@ -12,8 +13,9 @@ const TABS: { key: Tab; label: string; icon: string }[] = [
   { key: "character", label: "인물", icon: "👤" },
 ];
 
-function App() {
+function AppContent() {
   const [activeTab, setActiveTab] = useState<Tab>("quiz");
+  const { loading } = useUser();
   const [insets, setInsets] = useState(() => {
     try { return SafeAreaInsets.get(); }
     catch { return { top: 0, bottom: 0, left: 0, right: 0 }; }
@@ -28,6 +30,17 @@ function App() {
 
   const topPad = Math.max(insets.top, 0);
   const bottomPad = Math.max(insets.bottom, 12);
+
+  if (loading) {
+    return (
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100dvh", backgroundColor: "#F6F6F9" }}>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: "40px", marginBottom: "12px" }}>📖</div>
+          <div style={{ fontSize: "14px", color: "#9CA3AF", fontWeight: 600 }}>불러오는 중...</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ ...styles.app, paddingTop: topPad }}>
@@ -117,5 +130,13 @@ const styles: Record<string, React.CSSProperties> = {
     backgroundColor: "#0D9488",
   },
 };
+
+function App() {
+  return (
+    <UserProvider>
+      <AppContent />
+    </UserProvider>
+  );
+}
 
 export default App;
