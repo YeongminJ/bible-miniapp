@@ -538,7 +538,7 @@ export default function CharacterTab() {
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  container: { padding: "16px" },
+  container: { padding: "8px 16px 16px" },
   listHeader: { fontSize: "15px", fontWeight: 800, color: "#111827", marginTop: "24px", marginBottom: "12px" },
   filterRow: { display: "flex", gap: "8px", marginBottom: "16px", alignItems: "center" },
   filterButton: {

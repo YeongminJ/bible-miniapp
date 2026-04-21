@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Top } from "@toss/tds-mobile";
+import { useEffect, useState } from "react";
+import { SafeAreaInsets } from "@apps-in-toss/web-framework";
 import QuizTab from "./components/QuizTab";
 import PrayerTab from "./components/PrayerTab";
 import CharacterTab from "./components/CharacterTab";
@@ -14,35 +14,37 @@ const TABS: { key: Tab; label: string; icon: string }[] = [
 
 function App() {
   const [activeTab, setActiveTab] = useState<Tab>("quiz");
+  const [insets, setInsets] = useState(() => {
+    try { return SafeAreaInsets.get(); }
+    catch { return { top: 0, bottom: 0, left: 0, right: 0 }; }
+  });
+
+  useEffect(() => {
+    try {
+      const cleanup = SafeAreaInsets.subscribe({ onEvent: setInsets });
+      return cleanup;
+    } catch { /* unsupported env */ }
+  }, []);
+
+  const topPad = Math.max(insets.top, 0);
+  const bottomPad = Math.max(insets.bottom, 12);
 
   return (
-    <div style={styles.app}>
-      <Top
-        title={
-          <Top.TitleParagraph size={22}>
-            <span style={{ fontWeight: 900, letterSpacing: "-1px" }}>오늘의 말씀</span>
-          </Top.TitleParagraph>
-        }
-        subtitleBottom={
-          <div style={{ marginTop: 3 }}>
-            <Top.SubtitleParagraph size={13}>
-              {activeTab === "quiz" && "성경 퀴즈로 말씀을 즐겨보세요"}
-              {activeTab === "prayer" && "상황에 맞는 기도문을 읽어보세요"}
-              {activeTab === "character" && "성경 인물을 만나보세요"}
-            </Top.SubtitleParagraph>
-          </div>
-        }
-      />
-
+    <div style={{ ...styles.app, paddingTop: topPad }}>
       {/* 콘텐츠 */}
-      <div style={styles.content}>
+      <div
+        style={{
+          ...styles.content,
+          paddingBottom: `calc(70px + ${bottomPad}px)`,
+        }}
+      >
         {activeTab === "quiz" && <QuizTab />}
         {activeTab === "prayer" && <PrayerTab />}
         {activeTab === "character" && <CharacterTab />}
       </div>
 
       {/* 하단 탭바 */}
-      <div style={styles.tabBar}>
+      <div style={{ ...styles.tabBar, paddingBottom: bottomPad }}>
         {TABS.map((tab) => (
           <button
             key={tab.key}
@@ -70,16 +72,17 @@ function App() {
 
 const styles: Record<string, React.CSSProperties> = {
   app: {
-    minHeight: "100dvh",
+    height: "100dvh",
     backgroundColor: "#F6F6F9",
     display: "flex",
     flexDirection: "column",
-    paddingTop: "env(safe-area-inset-top, 0px)",
+    overflow: "hidden",
   },
   content: {
     flex: 1,
-    paddingBottom: "calc(70px + env(safe-area-inset-bottom, 20px))",
+    minHeight: 0,
     overflowY: "auto",
+    WebkitOverflowScrolling: "touch",
   },
   tabBar: {
     position: "fixed",
@@ -92,7 +95,6 @@ const styles: Record<string, React.CSSProperties> = {
     backdropFilter: "blur(20px)",
     borderTop: "1px solid #F3F4F6",
     paddingTop: "8px",
-    paddingBottom: "env(safe-area-inset-bottom, 12px)",
     zIndex: 100,
   },
   tab: {

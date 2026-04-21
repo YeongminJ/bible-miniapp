@@ -256,7 +256,7 @@ export default function PrayerTab() {
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  container: { padding: "16px" },
+  container: { padding: "8px 16px 16px" },
   profileBanner: {
     width: "100%", padding: "14px 16px", marginBottom: "12px",
     backgroundColor: "#ECFDF5", color: "#0F766E",

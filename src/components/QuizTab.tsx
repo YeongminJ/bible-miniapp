@@ -28,6 +28,7 @@ export default function QuizTab() {
   const [dailyQuizzes, setDailyQuizzes] = useState<Quiz[]>([]);
   const [lives, setLives] = useState(MAX_LIVES);
   const [adLoading, setAdLoading] = useState(false);
+  const [adNotice, setAdNotice] = useState<string | null>(null);
   const [showHeartBreak, setShowHeartBreak] = useState(false);
   const [streak, setStreak] = useState(0);
   const [totalPoints, setTotalPoints] = useState(0);
@@ -373,24 +374,41 @@ export default function QuizTab() {
             <VerseAudio reference={quiz.reference} verseText={quiz.verseText} />
           </div>
           {lives === 0 ? (
-            <button
-              style={{ ...styles.nextButton, ...styles.adButton, opacity: adLoading ? 0.7 : 1 }}
-              disabled={adLoading}
-              onClick={async () => {
-                setAdLoading(true);
-                await showInterstitialAd();
-                setAdLoading(false);
-                setLives(MAX_LIVES);
-                if (currentIndex < 4) {
-                  setCurrentIndex((i) => i + 1);
-                  setSelected(null);
-                } else {
-                  setFinished(true);
-                }
-              }}
-            >
-              {adLoading ? "광고 준비 중..." : "📺 광고 보고 계속하기"}
-            </button>
+            <>
+              <button
+                style={{ ...styles.nextButton, ...styles.adButton, opacity: adLoading ? 0.7 : 1 }}
+                disabled={adLoading}
+                onClick={async () => {
+                  setAdLoading(true);
+                  setAdNotice(null);
+                  const result = await showInterstitialAd();
+                  setAdLoading(false);
+                  if (!result.shown) {
+                    // 광고가 표시 안 됐어도 게임 진행은 막지 않음
+                    const messages: Record<string, string> = {
+                      "unsupported": "광고를 지원하지 않는 환경이라 그냥 이어가요.",
+                      "load-timeout": "광고 응답이 늦어 그냥 이어갈게요.",
+                      "load-error": "광고를 불러오지 못했어요. 그냥 이어갈게요.",
+                      "show-timeout": "광고 표시가 끝나지 않아 이어가요.",
+                      "show-failed": "광고 표시에 실패했어요. 이어갈게요.",
+                      "show-error": "광고 오류가 있었어요. 이어갈게요.",
+                    };
+                    setAdNotice(messages[result.reason] ?? "이어갈게요.");
+                    setTimeout(() => setAdNotice(null), 2400);
+                  }
+                  setLives(MAX_LIVES);
+                  if (currentIndex < 4) {
+                    setCurrentIndex((i) => i + 1);
+                    setSelected(null);
+                  } else {
+                    setFinished(true);
+                  }
+                }}
+              >
+                {adLoading ? "광고 준비 중..." : "📺 광고 보고 계속하기"}
+              </button>
+              {adNotice && <div style={styles.adNotice}>{adNotice}</div>}
+            </>
           ) : (
             <button
               style={styles.nextButton}
@@ -413,10 +431,10 @@ export default function QuizTab() {
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  container: { padding: "20px 16px", minHeight: "100%" },
+  container: { padding: "8px 20px 20px", minHeight: "100%" },
   loading: { textAlign: "center", padding: "40px", color: "#9CA3AF" },
   // Level select
-  levelSelect: { textAlign: "center" as const, paddingTop: "32px" },
+  levelSelect: { textAlign: "center" as const, paddingTop: "16px" },
   levelIcon: { fontSize: "56px", marginBottom: "16px" },
   levelTitle: { fontSize: "28px", fontWeight: 900, color: "#111827", letterSpacing: "-1px" },
   levelSubtitle: { fontSize: "15px", color: "#6B7280", marginTop: "8px", marginBottom: "32px" },
@@ -441,6 +459,11 @@ const styles: Record<string, React.CSSProperties> = {
   },
   adButton: {
     backgroundColor: "#F59E0B",
+  },
+  adNotice: {
+    marginTop: "10px", padding: "10px 12px", borderRadius: "10px",
+    backgroundColor: "#FEF3C7", color: "#92400E",
+    fontSize: "13px", fontWeight: 600, textAlign: "center" as const,
   },
   // Game bar
   gameBar: {
@@ -505,31 +528,40 @@ const styles: Record<string, React.CSSProperties> = {
   progressBar: { display: "flex", gap: "8px", marginBottom: "24px" },
   progressDot: { flex: 1, height: "4px", borderRadius: "2px" },
   badges: { display: "flex", gap: "8px", marginBottom: "16px" },
-  categoryBadge: { padding: "4px 12px", borderRadius: "100px", fontSize: "12px", fontWeight: 700, backgroundColor: "#F0FDFA", color: "#0D9488" },
-  questionNumber: { fontSize: "13px", fontWeight: 700, color: "#9CA3AF", marginBottom: "8px" },
-  question: { fontSize: "20px", fontWeight: 800, color: "#111827", lineHeight: "1.4", marginBottom: "24px", letterSpacing: "-0.5px" },
-  options: { display: "flex", flexDirection: "column", gap: "12px" },
+  categoryBadge: { padding: "5px 14px", borderRadius: "100px", fontSize: "13px", fontWeight: 800, backgroundColor: "#F0FDFA", color: "#0D9488", letterSpacing: "0.3px" },
+  questionNumber: { fontSize: "13px", fontWeight: 800, color: "#9CA3AF", marginBottom: "10px", letterSpacing: "0.5px" },
+  question: {
+    fontSize: "23px", fontWeight: 800, color: "#0F172A",
+    lineHeight: "1.45", marginBottom: "28px", letterSpacing: "-0.6px",
+    wordBreak: "keep-all" as const,
+  },
+  options: { display: "flex", flexDirection: "column", gap: "10px" },
   option: {
-    display: "flex", alignItems: "center", gap: "12px",
-    padding: "16px", borderRadius: "16px", border: "2px solid",
-    fontSize: "15px", fontWeight: 600, textAlign: "left" as const,
+    display: "flex", alignItems: "center", gap: "14px",
+    padding: "18px 18px", borderRadius: "16px", border: "2px solid",
+    fontSize: "16px", fontWeight: 600, textAlign: "left" as const,
     cursor: "pointer", width: "100%", background: "none",
+    lineHeight: "1.45", letterSpacing: "-0.2px",
+    wordBreak: "keep-all" as const,
   },
   optionLabel: {
-    width: "28px", height: "28px", borderRadius: "8px",
+    width: "32px", height: "32px", borderRadius: "10px",
     backgroundColor: "#F3F4F6", display: "flex", alignItems: "center",
-    justifyContent: "center", fontSize: "13px", fontWeight: 800, flexShrink: 0,
+    justifyContent: "center", fontSize: "14px", fontWeight: 800, flexShrink: 0,
   },
   explanation: {
-    marginTop: "20px", padding: "20px", backgroundColor: "#F8FAFC",
+    marginTop: "20px", padding: "20px 22px", backgroundColor: "#F8FAFC",
     borderRadius: "16px", borderLeft: "4px solid #0D9488",
   },
-  explanationTitle: { fontSize: "14px", fontWeight: 700, color: "#0D9488", marginBottom: "8px" },
-  explanationText: { fontSize: "14px", color: "#374151", lineHeight: "1.6", marginBottom: "8px" },
+  explanationTitle: { fontSize: "13px", fontWeight: 800, color: "#0D9488", marginBottom: "10px", letterSpacing: "0.5px" },
+  explanationText: {
+    fontSize: "15px", color: "#1F2937", lineHeight: "1.75",
+    marginBottom: "8px", wordBreak: "keep-all" as const, letterSpacing: "-0.2px",
+  },
   nextButton: {
-    width: "100%", padding: "14px", borderRadius: "12px", marginTop: "16px",
-    backgroundColor: "#0D9488", color: "#FFFFFF", fontSize: "15px",
-    fontWeight: 700, border: "none", cursor: "pointer",
+    width: "100%", padding: "16px", borderRadius: "14px", marginTop: "18px",
+    backgroundColor: "#0D9488", color: "#FFFFFF", fontSize: "16px",
+    fontWeight: 800, border: "none", cursor: "pointer", letterSpacing: "-0.2px",
   },
   // Result
   resultCard: {
