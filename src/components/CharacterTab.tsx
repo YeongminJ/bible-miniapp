@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { loadFullScreenAd, showFullScreenAd } from "@apps-in-toss/web-framework";
 import VerseAudio from "./VerseAudio";
+import { track } from "../lib/analytics";
 
 // TODO: 실제 앱인토스 콘솔에서 발급받은 광고 그룹 ID로 교체해주세요.
 const AD_GROUP_ID = "";
@@ -239,6 +240,13 @@ export default function CharacterTab() {
 
     setMatchedChar(best);
     setQuizPhase("result");
+    if (best) {
+      track.impression("character_quiz_result", {
+        character_id: best.id,
+        name: best.name,
+        virtue: best.keyVirtue,
+      });
+    }
   }
 
   function resetQuiz() {
@@ -260,7 +268,13 @@ export default function CharacterTab() {
 
     return (
       <div style={styles.container}>
-        <button style={styles.backButton} onClick={() => setSelectedChar(null)}>
+        <button
+          style={styles.backButton}
+          onClick={() => {
+            track.click("character_detail_back", { character_id: selectedChar.id, name: selectedChar.name });
+            setSelectedChar(null);
+          }}
+        >
           ← 목록으로
         </button>
         <div style={styles.detailCard}>
@@ -385,7 +399,13 @@ export default function CharacterTab() {
               <div style={styles.quizDesc}>
                 {quizData.questions.length}가지 질문으로 나와 가장 닮은 인물을 찾아보세요
               </div>
-              <button style={styles.quizStartBtn} onClick={startQuiz}>
+              <button
+                style={styles.quizStartBtn}
+                onClick={() => {
+                  track.click("character_quiz_start");
+                  startQuiz();
+                }}
+              >
                 시작하기
               </button>
             </div>
@@ -441,7 +461,10 @@ export default function CharacterTab() {
                     cursor: lastAnswerIndex === null || adLoading ? "not-allowed" : "pointer",
                   }}
                   disabled={lastAnswerIndex === null || adLoading}
-                  onClick={handleWatchAdAndFinish}
+                  onClick={() => {
+                    track.click("character_quiz_ad_requested");
+                    handleWatchAdAndFinish();
+                  }}
                 >
                   {adLoading ? "광고 불러오는 중…" : "🎬 광고보고 나에게 맞는 인물 확인하기"}
                 </button>
@@ -469,11 +492,23 @@ export default function CharacterTab() {
               <div style={styles.quizResultButtons}>
                 <button
                   style={styles.quizResultDetailBtn}
-                  onClick={() => setSelectedChar(matchedChar)}
+                  onClick={() => {
+                    track.click("character_quiz_result_detail", {
+                      character_id: matchedChar.id,
+                      name: matchedChar.name,
+                    });
+                    setSelectedChar(matchedChar);
+                  }}
                 >
                   자세히 보기
                 </button>
-                <button style={styles.quizResultRetryBtn} onClick={resetQuiz}>
+                <button
+                  style={styles.quizResultRetryBtn}
+                  onClick={() => {
+                    track.click("character_quiz_retry");
+                    resetQuiz();
+                  }}
+                >
                   다시 하기
                 </button>
               </div>
@@ -488,7 +523,10 @@ export default function CharacterTab() {
         {ERAS.map((era) => (
           <button
             key={era}
-            onClick={() => setFilter(era)}
+            onClick={() => {
+              track.click("character_filter_change", { era });
+              setFilter(era);
+            }}
             style={{
               ...styles.filterButton,
               backgroundColor: era === filter ? "#0D9488" : "#F3F4F6",
@@ -512,7 +550,15 @@ export default function CharacterTab() {
                 ...styles.charCard,
                 background: `linear-gradient(160deg, ${colors[0]}, ${colors[1]})`,
               }}
-              onClick={() => setSelectedChar(char)}
+              onClick={() => {
+                track.click("character_detail_open", {
+                  character_id: char.id,
+                  name: char.name,
+                  era: char.era,
+                  testament: char.testament,
+                });
+                setSelectedChar(char);
+              }}
             >
               <div style={styles.charImageWrap}>
                 <img

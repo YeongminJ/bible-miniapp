@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import VerseAudio from "./VerseAudio";
 import { showInterstitialAd } from "../lib/ad";
+import { track } from "../lib/analytics";
 
 const MAX_LIVES = 2;
 
@@ -55,10 +56,15 @@ export default function QuizTab() {
           stopTimer();
           // 시간 초과 = 오답 처리
           setSelected(-1);
-          setLives((l) => Math.max(0, l - 1));
+          setLives((l) => {
+            const next = Math.max(0, l - 1);
+            track.click("quiz_life_lost", { reason: "timeout", lives_left: next });
+            return next;
+          });
           setStreak(0);
           setShowHeartBreak(true);
           setTimeout(() => setShowHeartBreak(false), 750);
+          track.click("quiz_answer", { correct: false, reason: "timeout", index: currentIndex });
           return 0;
         }
         return t - 1;
@@ -74,6 +80,7 @@ export default function QuizTab() {
   }, []);
 
   const startQuiz = (diff: Difficulty) => {
+    track.click("quiz_start", { difficulty: diff });
     setDifficulty(diff);
     const pool = diff === "전체"
       ? allQuizzes
@@ -138,6 +145,14 @@ export default function QuizTab() {
     if (score === 5 && !showConfetti) {
       setShowConfetti(true);
     }
+    // 결과 노출 로깅 (중복 방지 위해 ref 없이 useEffect 대체로 간단히 한번만 보내기)
+    // 브라우저/SDK 쪽에서 중복 집계는 허용범위로 간주
+    track.impression("quiz_complete", {
+      difficulty: difficulty ?? "unknown",
+      score,
+      total_points: totalPoints,
+      perfect: score === 5,
+    });
     return (
       <div style={styles.container}>
         {/* 폭죽 효과 */}
@@ -169,10 +184,22 @@ export default function QuizTab() {
               : "더 많은 말씀을 읽어보아요!"}
           </div>
           <div style={styles.resultButtons}>
-            <button style={styles.retryButton} onClick={() => startQuiz(difficulty)}>
+            <button
+              style={styles.retryButton}
+              onClick={() => {
+                track.click("quiz_retry", { previous_difficulty: difficulty ?? "unknown", previous_score: score });
+                startQuiz(difficulty);
+              }}
+            >
               다시 도전하기
             </button>
-            <button style={styles.backButton} onClick={() => setDifficulty(null)}>
+            <button
+              style={styles.backButton}
+              onClick={() => {
+                track.click("quiz_back_to_level");
+                setDifficulty(null);
+              }}
+            >
               난이도 변경
             </button>
           </div>
@@ -338,7 +365,8 @@ export default function QuizTab() {
                 if (selected !== null) return;
                 stopTimer();
                 setSelected(i);
-                if (i === quiz.answer) {
+                const correct = i === quiz.answer;
+                if (correct) {
                   const newStreak = streak + 1;
                   setStreak(newStreak);
                   setScore((s) => s + 1);
@@ -349,11 +377,25 @@ export default function QuizTab() {
                   const label = newStreak >= 3 ? `🔥x${newStreak} +${pts}` : newStreak >= 2 ? `🔥 +${pts}` : `+${pts}`;
                   setPointPopup({ text: label, key: Date.now() });
                   setTimeout(() => setPointPopup(null), 800);
+                  track.click("quiz_answer", {
+                    correct: true, index: currentIndex, option: i,
+                    category: quiz.category, difficulty: quiz.difficulty,
+                    time_left: timer, streak: newStreak, points: pts,
+                  });
                 } else {
                   setStreak(0);
-                  setLives((l) => Math.max(0, l - 1));
+                  setLives((l) => {
+                    const next = Math.max(0, l - 1);
+                    track.click("quiz_life_lost", { reason: "wrong", lives_left: next });
+                    return next;
+                  });
                   setShowHeartBreak(true);
                   setTimeout(() => setShowHeartBreak(false), 750);
+                  track.click("quiz_answer", {
+                    correct: false, index: currentIndex, option: i,
+                    category: quiz.category, difficulty: quiz.difficulty,
+                    time_left: timer,
+                  });
                 }
               }}
             >
@@ -379,10 +421,15 @@ export default function QuizTab() {
                 style={{ ...styles.nextButton, ...styles.adButton, opacity: adLoading ? 0.7 : 1 }}
                 disabled={adLoading}
                 onClick={async () => {
+                  track.click("quiz_ad_requested", { index: currentIndex, difficulty: quiz.difficulty });
                   setAdLoading(true);
                   setAdNotice(null);
                   const result = await showInterstitialAd();
                   setAdLoading(false);
+                  track.impression("quiz_ad_result", {
+                    shown: result.shown,
+                    reason: result.shown ? "dismissed" : result.reason,
+                  });
                   if (!result.shown) {
                     // 광고가 표시 안 됐어도 게임 진행은 막지 않음
                     const messages: Record<string, string> = {
@@ -414,9 +461,11 @@ export default function QuizTab() {
               style={styles.nextButton}
               onClick={() => {
                 if (currentIndex < 4) {
+                  track.click("quiz_next_question", { from_index: currentIndex, score });
                   setCurrentIndex((i) => i + 1);
                   setSelected(null);
                 } else {
+                  track.click("quiz_finish_request", { score });
                   setFinished(true);
                 }
               }}

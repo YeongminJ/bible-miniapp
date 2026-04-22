@@ -4,6 +4,7 @@ import QuizTab from "./components/QuizTab";
 import PrayerTab from "./components/PrayerTab";
 import CharacterTab from "./components/CharacterTab";
 import { UserProvider, useUser } from "./lib/UserContext";
+import { track } from "./lib/analytics";
 
 type Tab = "quiz" | "prayer" | "character";
 
@@ -27,6 +28,14 @@ function AppContent() {
       return cleanup;
     } catch { /* unsupported env */ }
   }, []);
+
+  useEffect(() => {
+    track.screen("app_open");
+  }, []);
+
+  useEffect(() => {
+    track.screen(`tab_${activeTab}`, { tab: activeTab });
+  }, [activeTab]);
 
   const topPad = Math.max(insets.top, 0);
   const bottomPad = Math.max(insets.bottom, 12);
@@ -65,7 +74,10 @@ function AppContent() {
               ...styles.tab,
               color: activeTab === tab.key ? "#0D9488" : "#9CA3AF",
             }}
-            onClick={() => setActiveTab(tab.key)}
+            onClick={() => {
+              track.click("tab_change", { from: activeTab, to: tab.key });
+              setActiveTab(tab.key);
+            }}
           >
             <span style={{ fontSize: "24px" }}>{tab.icon}</span>
             <span style={{

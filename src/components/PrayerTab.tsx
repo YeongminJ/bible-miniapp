@@ -5,6 +5,7 @@ import ProfileSelector from "./ProfileSelector";
 import { loadProfile, matchScore, type UserProfile } from "../lib/profile";
 import { useUser } from "../lib/UserContext";
 import { saveUserData } from "../lib/userStore";
+import { track } from "../lib/analytics";
 
 interface Prayer {
   id: number;
@@ -97,6 +98,12 @@ export default function PrayerTab() {
     const updated = getReadPrayers();
     setReadIds(updated);
     saveUserData({ readPrayers: [...updated] });
+    const prayer = prayers.find((p) => p.id === prayerId);
+    track.click("prayer_amen", {
+      prayer_id: prayerId,
+      category: prayer?.category,
+      total_read: updated.size,
+    });
     setReadAlongPrayer(null);
   };
 
@@ -107,11 +114,21 @@ export default function PrayerTab() {
         initial={profile}
         title={profile ? "맞춤 설정 수정" : "맞춤 기도 설정"}
         onDone={(p) => {
+          track.click("prayer_profile_saved", {
+            age: p.ageGroup,
+            life_stage: p.lifeStage,
+            family: p.family,
+            focus: p.focus.join(","),
+            is_update: Boolean(profile),
+          });
           setProfile(p);
           setShowProfileEditor(false);
           setSelectedCategory("맞춤");
         }}
-        onSkip={() => setShowProfileEditor(false)}
+        onSkip={() => {
+          track.click("prayer_profile_skip");
+          setShowProfileEditor(false);
+        }}
       />
     );
   }
@@ -134,7 +151,10 @@ export default function PrayerTab() {
       {!profile ? (
         <button
           style={styles.profileBanner}
-          onClick={() => setShowProfileEditor(true)}
+          onClick={() => {
+            track.click("prayer_profile_banner_open");
+            setShowProfileEditor(true);
+          }}
         >
           <span>✨ 나에게 맞는 기도를 보려면 프로필을 설정해주세요</span>
           <span style={styles.bannerArrow}>›</span>
@@ -142,7 +162,10 @@ export default function PrayerTab() {
       ) : (
         <button
           style={styles.profileInfo}
-          onClick={() => setShowProfileEditor(true)}
+          onClick={() => {
+            track.click("prayer_profile_edit_open");
+            setShowProfileEditor(true);
+          }}
         >
           <span style={styles.profileBadge}>
             {profile.ageGroup} · {profile.lifeStage} · {profile.family}
@@ -160,9 +183,11 @@ export default function PrayerTab() {
               key={cat}
               onClick={() => {
                 if (disabled) {
+                  track.click("prayer_profile_banner_open", { from: "disabled_custom_tab" });
                   setShowProfileEditor(true);
                   return;
                 }
+                track.click("prayer_category_change", { category: cat });
                 setSelectedCategory(cat);
               }}
               style={{
@@ -186,7 +211,12 @@ export default function PrayerTab() {
             backgroundColor: showReadOnly ? "#0D9488" : "#F0FDFA",
             color: showReadOnly ? "#FFFFFF" : "#0D9488",
           }}
-          onClick={() => setShowReadOnly((v) => !v)}
+          onClick={() =>
+            setShowReadOnly((v) => {
+              track.click("prayer_readonly_toggle", { enabled: !v });
+              return !v;
+            })
+          }
         >
           <span>
             🙏 {showReadOnly
@@ -221,7 +251,17 @@ export default function PrayerTab() {
             }}>
               <button
                 style={styles.cardHeader}
-                onClick={() => setExpandedId(isExpanded ? null : prayer.id)}
+                onClick={() => {
+                  if (!isExpanded) {
+                    track.click("prayer_detail_open", {
+                      prayer_id: prayer.id,
+                      category: prayer.category,
+                      has_profile: Boolean(profile),
+                      already_read: isRead,
+                    });
+                  }
+                  setExpandedId(isExpanded ? null : prayer.id);
+                }}
               >
                 <div style={{ flex: 1 }}>
                   <div style={styles.categoryRow}>
@@ -244,7 +284,13 @@ export default function PrayerTab() {
                   />
                   <button
                     style={styles.readAlongButton}
-                    onClick={() => setReadAlongPrayer(prayer)}
+                    onClick={() => {
+                      track.click("prayer_read_along_start", {
+                        prayer_id: prayer.id,
+                        category: prayer.category,
+                      });
+                      setReadAlongPrayer(prayer);
+                    }}
                   >
                     🎙️ 따라 읽기
                   </button>
