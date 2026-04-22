@@ -1,10 +1,10 @@
 import { loadFullScreenAd, showFullScreenAd } from "@apps-in-toss/web-framework";
 
-// 앱인토스 콘솔에서 생성한 전면광고 광고 그룹 ID로 교체해야 해요.
-// 필요 시 .env 에 VITE_AD_GROUP_ID 지정하면 우선 사용.
+// 앱인토스 콘솔에서 발급한 전면광고 광고 그룹 ID (v2 live).
+// 필요 시 .env 의 VITE_AD_GROUP_ID 로 덮어쓸 수 있어요.
 const AD_GROUP_ID =
   (import.meta.env.VITE_AD_GROUP_ID as string | undefined) ??
-  "toss-full-screen-ad-placeholder";
+  "ait.v2.live.c9e7e5f5fd554e91";
 
 const LOAD_TIMEOUT_MS = 6000; // 광고 로드 대기 한계
 const SHOW_TIMEOUT_MS = 30000; // 광고 노출~닫힘 대기 한계 (사용자가 안 닫는 경우 안전망)
