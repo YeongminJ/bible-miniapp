@@ -5,7 +5,7 @@ export default defineConfig({
   brand: {
     displayName: "오늘의 말씀",
     primaryColor: "#0D9488",
-    icon: "./public/icons/logo-600.png",
+    icon: "https://static.toss.im/appsintoss/36039/369de236-5bbb-4149-a83a-8aadfef3330d.png",
   },
   web: {
     host: "0.0.0.0",
