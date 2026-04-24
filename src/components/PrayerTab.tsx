@@ -139,6 +139,9 @@ export default function PrayerTab() {
       <ReadAlongMode
         title={readAlongPrayer.title}
         content={readAlongPrayer.content}
+        reference={readAlongPrayer.relatedVerse}
+        verseText={readAlongPrayer.relatedVerseText}
+        category={readAlongPrayer.category}
         onClose={() => handleReadComplete(readAlongPrayer.id)}
       />
     );

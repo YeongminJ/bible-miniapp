@@ -1,12 +1,18 @@
 import { useState } from "react";
+import VerseAudio from "./VerseAudio";
+import { shareMessage } from "../lib/share";
+import { track } from "../lib/analytics";
 
 interface ReadAlongModeProps {
   title: string;
   content: string;
   onClose: () => void;
+  reference?: string;
+  verseText?: string;
+  category?: string;
 }
 
-export default function ReadAlongMode({ title, content, onClose }: ReadAlongModeProps) {
+export default function ReadAlongMode({ title, content, onClose, reference, verseText, category }: ReadAlongModeProps) {
   const sentences = content
     .split(/(?<=[.!?다요세라니])\s+/)
     .filter((s) => s.trim().length > 0);
@@ -27,9 +33,41 @@ export default function ReadAlongMode({ title, content, onClose }: ReadAlongMode
           <div style={styles.doneText}>
             {sentences.length}문장을 따라 읽으셨습니다
           </div>
-          <button style={styles.doneButton} onClick={onClose}>
-            아멘 🕊️
-          </button>
+
+          {reference && (
+            <div style={styles.doneVerseBox}>
+              <div style={styles.doneVerseLabel}>오늘의 말씀 · {reference}</div>
+              {verseText && <div style={styles.doneVerseText}>{verseText}</div>}
+              <div style={styles.doneVerseAudio}>
+                <VerseAudio reference={reference} verseText={verseText} />
+              </div>
+            </div>
+          )}
+
+          <div style={styles.doneActions}>
+            <button
+              style={styles.doneShareButton}
+              onClick={async () => {
+                const parts = [
+                  `🙏 기도를 마쳤습니다`,
+                  `"${title}"`,
+                  content,
+                ];
+                if (reference) {
+                  parts.push("");
+                  parts.push(`📖 ${reference}`);
+                  if (verseText) parts.push(verseText);
+                }
+                const res = await shareMessage(parts.join("\n"));
+                track.click("prayer_read_along_share", { category, ok: res.ok });
+              }}
+            >
+              📤 공유하기
+            </button>
+            <button style={styles.doneButton} onClick={onClose}>
+              아멘 🕊️
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -181,15 +219,43 @@ const styles: Record<string, React.CSSProperties> = {
   },
   doneCard: {
     flex: 1, display: "flex", flexDirection: "column",
-    alignItems: "center", justifyContent: "center", padding: "32px",
+    alignItems: "center", justifyContent: "center", padding: "32px 24px",
+    overflowY: "auto",
   },
   doneTitle: { fontSize: "24px", fontWeight: 900, color: "#111827", marginBottom: "8px" },
-  doneSubtitle: { fontSize: "16px", color: "#0D9488", fontWeight: 600, marginBottom: "16px" },
-  doneText: { fontSize: "14px", color: "#9CA3AF", marginBottom: "32px" },
+  doneSubtitle: { fontSize: "16px", color: "#0D9488", fontWeight: 600, marginBottom: "16px", textAlign: "center" as const },
+  doneText: { fontSize: "14px", color: "#9CA3AF", marginBottom: "24px" },
+  doneVerseBox: {
+    width: "100%", maxWidth: "400px",
+    backgroundColor: "#F0FDFA", borderRadius: "16px",
+    padding: "20px", marginBottom: "24px",
+    border: "1px solid #CCFBF1",
+  },
+  doneVerseLabel: {
+    fontSize: "12px", fontWeight: 800, color: "#0D9488",
+    letterSpacing: "0.5px", marginBottom: "10px",
+  },
+  doneVerseText: {
+    fontSize: "15px", color: "#134E4A", lineHeight: 1.7,
+    marginBottom: "12px", wordBreak: "keep-all" as const,
+  },
+  doneVerseAudio: {
+    display: "flex", justifyContent: "center",
+  },
+  doneActions: {
+    display: "flex", gap: "10px", width: "100%", maxWidth: "400px",
+  },
+  doneShareButton: {
+    flex: 1, padding: "14px", borderRadius: "14px",
+    backgroundColor: "#F3F4F6", color: "#374151",
+    fontSize: "15px", fontWeight: 800,
+    border: "1px solid #E5E7EB", cursor: "pointer",
+    display: "flex", alignItems: "center", justifyContent: "center", gap: "6px",
+  },
   doneButton: {
-    padding: "16px 40px", borderRadius: "16px",
+    flex: 1, padding: "14px", borderRadius: "14px",
     backgroundColor: "#0D9488", color: "#FFFFFF",
-    fontSize: "17px", fontWeight: 800, border: "none", cursor: "pointer",
-    display: "flex", alignItems: "center", gap: "8px",
+    fontSize: "15px", fontWeight: 800, border: "none", cursor: "pointer",
+    display: "flex", alignItems: "center", justifyContent: "center", gap: "6px",
   },
 };
