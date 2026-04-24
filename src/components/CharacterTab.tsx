@@ -4,24 +4,16 @@ import { track } from "../lib/analytics";
 import { showInterstitialAd } from "../lib/ad";
 import { shareMessage } from "../lib/share";
 
-// 닉네임 · 닮은 인물 이력 저장 키
-const NICKNAME_KEY = "userNickname.v1";
+// 닮은 인물 이력 저장 키
 const MATCH_HISTORY_KEY = "characterMatchHistory.v1";
 
 type MatchHistoryEntry = {
   characterId: number;
   name: string;
   virtue: string;
-  nickname: string;
   timestamp: number;
 };
 
-function loadNickname(): string {
-  try { return localStorage.getItem(NICKNAME_KEY) || ""; } catch { return ""; }
-}
-function saveNickname(v: string) {
-  try { localStorage.setItem(NICKNAME_KEY, v); } catch { /* ignore */ }
-}
 function loadMatchHistory(): MatchHistoryEntry[] {
   try {
     const raw = localStorage.getItem(MATCH_HISTORY_KEY);
@@ -129,10 +121,7 @@ export default function CharacterTab() {
   const [matchedChar, setMatchedChar] = useState<Character | null>(null);
   const [lastAnswerIndex, setLastAnswerIndex] = useState<number | null>(null);
   const [adLoading, setAdLoading] = useState(false);
-  const [nickname, setNickname] = useState(loadNickname);
   const [history, setHistory] = useState<MatchHistoryEntry[]>(loadMatchHistory);
-  const [nicknameDraft, setNicknameDraft] = useState("");
-  const [editingNickname, setEditingNickname] = useState(false);
   const [shareNotice, setShareNotice] = useState<string | null>(null);
 
   useEffect(() => {
@@ -241,7 +230,6 @@ export default function CharacterTab() {
         characterId: best.id,
         name: best.name,
         virtue: best.keyVirtue,
-        nickname,
         timestamp: Date.now(),
       };
       const next = [entry, ...history].slice(0, 20);
@@ -251,22 +239,13 @@ export default function CharacterTab() {
   }
 
   async function shareMatchResult(char: Character) {
-    const who = nickname ? `${nickname}님` : "나";
-    const message = `${who}의 가장 닮은 성경 인물은 "${char.name} (${char.title})" 입니다!\n\n${char.summary}\n\n나도 테스트 하러 가기 👉`;
+    const message = `나와 가장 닮은 성경 인물은 "${char.name} (${char.title})" 입니다!\n\n${char.summary}\n\n나도 테스트 하러 가기 👉`;
     const res = await shareMessage(message);
     track.click("character_match_share", { character_id: char.id, name: char.name, ok: res.ok });
     if (!res.ok) {
       setShareNotice("공유 기능을 지원하지 않는 환경이에요.");
       setTimeout(() => setShareNotice(null), 2500);
     }
-  }
-
-  function handleNicknameSave() {
-    const v = nicknameDraft.trim().slice(0, 12);
-    setNickname(v);
-    saveNickname(v);
-    setEditingNickname(false);
-    track.click("character_nickname_save", { has_value: Boolean(v) });
   }
 
   function resetQuiz() {
@@ -417,7 +396,7 @@ export default function CharacterTab() {
       {lastChar && quizPhase === "intro" && (
         <div style={styles.lastMatchCard}>
           <div style={styles.lastMatchHeader}>
-            <span style={styles.lastMatchTag}>⭐ {lastMatch?.nickname ? `${lastMatch.nickname}님과` : "나와"} 닮은 인물</span>
+            <span style={styles.lastMatchTag}>⭐ 나와 닮은 인물</span>
           </div>
           <button
             style={styles.lastMatchInner}
@@ -550,9 +529,7 @@ export default function CharacterTab() {
               ...styles.quizResult,
               background: `linear-gradient(160deg, ${(ERA_COLORS[matchedChar.era] || ["#374151", "#6B7280"])[0]}, ${(ERA_COLORS[matchedChar.era] || ["#374151", "#6B7280"])[1]})`,
             }}>
-              <div style={styles.quizResultLabel}>
-                {nickname ? `${nickname}님과` : "나와"} 가장 닮은 인물
-              </div>
+              <div style={styles.quizResultLabel}>나와 가장 닮은 인물</div>
               <img
                 src={getCharacterImageUrl(matchedChar.id)}
                 alt={matchedChar.name}
@@ -564,33 +541,6 @@ export default function CharacterTab() {
                 {getVirtueIcon(matchedChar.keyVirtue)} {matchedChar.keyVirtue}
               </div>
               <div style={styles.quizResultSummary}>{matchedChar.summary}</div>
-
-              {/* 닉네임 입력/수정 */}
-              <div style={styles.nicknameBox}>
-                {editingNickname ? (
-                  <div style={{ display: "flex", gap: "6px", width: "100%" }}>
-                    <input
-                      autoFocus
-                      value={nicknameDraft}
-                      onChange={(e) => setNicknameDraft(e.target.value)}
-                      placeholder="닉네임 (최대 12자)"
-                      maxLength={12}
-                      style={styles.nicknameInput}
-                    />
-                    <button style={styles.nicknameSaveBtn} onClick={handleNicknameSave}>저장</button>
-                  </div>
-                ) : (
-                  <button
-                    style={styles.nicknameEdit}
-                    onClick={() => {
-                      setNicknameDraft(nickname);
-                      setEditingNickname(true);
-                    }}
-                  >
-                    {nickname ? `✏️ ${nickname}` : "✏️ 닉네임 설정하기"}
-                  </button>
-                )}
-              </div>
 
               <div style={styles.quizResultButtons}>
                 <button
@@ -845,28 +795,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: "13px", fontWeight: 800,
     border: "1px solid rgba(255,255,255,0.3)", cursor: "pointer",
   },
-  // Nickname / Share
-  nicknameBox: {
-    marginTop: "14px", marginBottom: "4px",
-    display: "flex", justifyContent: "center",
-  },
-  nicknameEdit: {
-    padding: "8px 16px", borderRadius: "100px",
-    backgroundColor: "rgba(255,255,255,0.18)",
-    color: "#FFFFFF", fontSize: "13px", fontWeight: 700,
-    border: "1px solid rgba(255,255,255,0.3)", cursor: "pointer",
-  },
-  nicknameInput: {
-    flex: 1, padding: "10px 14px", borderRadius: "12px",
-    border: "1px solid rgba(255,255,255,0.5)",
-    backgroundColor: "rgba(255,255,255,0.95)",
-    fontSize: "14px", fontWeight: 600, color: "#111827",
-  },
-  nicknameSaveBtn: {
-    padding: "10px 16px", borderRadius: "12px",
-    backgroundColor: "#FFFFFF", color: "#0F766E",
-    fontSize: "13px", fontWeight: 800, border: "none", cursor: "pointer",
-  },
+  // Share
   quizResultShareBtn: {
     padding: "10px 20px", borderRadius: "100px",
     backgroundColor: "#FFFFFF", color: "#0F766E",
