@@ -2,8 +2,10 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import VerseAudio from "./VerseAudio";
 import { showInterstitialAd } from "../lib/ad";
 import { track } from "../lib/analytics";
+import { shareMessage } from "../lib/share";
 
 const MAX_LIVES = 2;
+const QUESTIONS_PER_ROUND = 5;
 
 interface Quiz {
   id: number;
@@ -17,7 +19,7 @@ interface Quiz {
   verseText?: string;
 }
 
-type Difficulty = "전체" | "쉬움" | "보통" | "어려움";
+type Difficulty = "전체" | "쉬움" | "보통" | "어려움" | "무한";
 
 export default function QuizTab() {
   const [allQuizzes, setAllQuizzes] = useState<Quiz[]>([]);
@@ -82,12 +84,12 @@ export default function QuizTab() {
   const startQuiz = (diff: Difficulty) => {
     track.click("quiz_start", { difficulty: diff });
     setDifficulty(diff);
-    const pool = diff === "전체"
+    const pool = (diff === "전체" || diff === "무한")
       ? allQuizzes
       : allQuizzes.filter((q) => q.difficulty === diff);
     const seed = Date.now();
     const shuffled = [...pool].sort(() => Math.sin(seed + Math.random()) - 0.5);
-    setDailyQuizzes(shuffled.slice(0, 5));
+    setDailyQuizzes(diff === "무한" ? shuffled : shuffled.slice(0, QUESTIONS_PER_ROUND));
     setCurrentIndex(0);
     setSelected(null);
     setScore(0);
@@ -98,6 +100,9 @@ export default function QuizTab() {
     setShowConfetti(false);
   };
 
+  const isInfinite = difficulty === "무한";
+  const totalQuestions = dailyQuizzes.length;
+
   // 난이도 선택 화면
   if (difficulty === null) {
     return (
@@ -107,7 +112,7 @@ export default function QuizTab() {
           <div style={styles.levelTitle}>성경 퀴즈</div>
           <div style={styles.levelSubtitle}>난이도를 선택하세요</div>
           <div style={styles.levelButtons}>
-            {(["쉬움", "보통", "어려움", "전체"] as Difficulty[]).map((diff) => (
+            {(["쉬움", "보통", "어려움", "전체", "무한"] as Difficulty[]).map((diff) => (
               <button
                 key={diff}
                 style={{
@@ -115,16 +120,20 @@ export default function QuizTab() {
                   ...(diff === "쉬움" ? { backgroundColor: "#DCFCE7", color: "#166534" } :
                     diff === "보통" ? { backgroundColor: "#FEF3C7", color: "#92400E" } :
                     diff === "어려움" ? { backgroundColor: "#FEE2E2", color: "#991B1B" } :
+                    diff === "무한" ? { backgroundColor: "#EDE9FE", color: "#5B21B6" } :
                     { backgroundColor: "#F0FDFA", color: "#0D9488" }),
                 }}
                 onClick={() => startQuiz(diff)}
               >
                 <span style={styles.levelEmoji}>
-                  {diff === "쉬움" ? "🌱" : diff === "보통" ? "🌿" : diff === "어려움" ? "🌳" : "🎯"}
+                  {diff === "쉬움" ? "🌱" : diff === "보통" ? "🌿" : diff === "어려움" ? "🌳" : diff === "무한" ? "♾️" : "🎯"}
                 </span>
-                <span style={styles.levelLabel}>{diff}</span>
+                <span style={styles.levelLabel}>
+                  {diff}
+                  {diff === "무한" && <span style={styles.levelTag}> 목숨 다할 때까지</span>}
+                </span>
                 <span style={styles.levelCount}>
-                  {diff === "전체"
+                  {diff === "전체" || diff === "무한"
                     ? `${allQuizzes.length}문제`
                     : `${allQuizzes.filter((q) => q.difficulty === diff).length}문제`}
                 </span>
@@ -142,17 +151,27 @@ export default function QuizTab() {
 
   // 결과 화면
   if (finished) {
-    if (score === 5 && !showConfetti) {
+    const answered = currentIndex + (selected !== null ? 1 : 0);
+    const perfect = !isInfinite && score === QUESTIONS_PER_ROUND;
+    if (perfect && !showConfetti) {
       setShowConfetti(true);
     }
-    // 결과 노출 로깅 (중복 방지 위해 ref 없이 useEffect 대체로 간단히 한번만 보내기)
-    // 브라우저/SDK 쪽에서 중복 집계는 허용범위로 간주
     track.impression("quiz_complete", {
       difficulty: difficulty ?? "unknown",
       score,
+      answered,
       total_points: totalPoints,
-      perfect: score === 5,
+      perfect,
+      mode: isInfinite ? "infinite" : "round",
     });
+    const headline = isInfinite
+      ? `🌟 ${answered}문제 도전!`
+      : perfect
+        ? "🎉 퍼펙트! 성경 박사시네요!"
+        : score >= 3
+          ? "잘하셨어요! 말씀을 잘 알고 계시네요."
+          : "더 많은 말씀을 읽어보아요!";
+    const scoreLabel = isInfinite ? `${score} / ${answered}` : `${score}/${QUESTIONS_PER_ROUND}`;
     return (
       <div style={styles.container}>
         {/* 폭죽 효과 */}
@@ -174,16 +193,32 @@ export default function QuizTab() {
         )}
         <div style={styles.resultCard}>
           <div style={styles.resultIcon}>
-            {score >= 4 ? "🏆" : score >= 2 ? "👏" : "📖"}
+            {isInfinite
+              ? (score >= 20 ? "👑" : score >= 10 ? "🏆" : score >= 5 ? "🔥" : "📖")
+              : (score >= 4 ? "🏆" : score >= 2 ? "👏" : "📖")}
           </div>
-          <div style={styles.resultScore}>{score}/5</div>
+          <div style={styles.resultScore}>{scoreLabel}</div>
           <div style={styles.resultPoints}>⭐ {totalPoints}점</div>
-          <div style={styles.resultText}>
-            {score === 5 ? "🎉 퍼펙트! 성경 박사시네요!"
-              : score >= 3 ? "잘하셨어요! 말씀을 잘 알고 계시네요."
-              : "더 많은 말씀을 읽어보아요!"}
-          </div>
+          <div style={styles.resultText}>{headline}</div>
           <div style={styles.resultButtons}>
+            <button
+              style={styles.shareResultButton}
+              onClick={async () => {
+                const modeLabel = isInfinite ? "무한 모드" : `${difficulty} 난이도`;
+                const msg = isInfinite
+                  ? `📖 성경 퀴즈 ${modeLabel}\n${score}/${answered} 정답 · ${totalPoints}점!\n\n나도 도전해보기 👉`
+                  : `📖 성경 퀴즈 ${modeLabel}\n${score}/${QUESTIONS_PER_ROUND} 정답 · ${totalPoints}점!\n\n나도 도전해보기 👉`;
+                const res = await shareMessage(msg);
+                track.click("quiz_share_result", {
+                  difficulty: difficulty ?? "unknown",
+                  mode: isInfinite ? "infinite" : "round",
+                  score,
+                  ok: res.ok,
+                });
+              }}
+            >
+              📤 결과 공유하기
+            </button>
             <button
               style={styles.retryButton}
               onClick={() => {
@@ -309,27 +344,36 @@ export default function QuizTab() {
         </div>
       </div>
 
-      {/* 진행 바 */}
-      <div style={styles.progressBar}>
-        {dailyQuizzes.map((_, i) => (
-          <div
-            key={i}
-            style={{
-              ...styles.progressDot,
-              backgroundColor: i <= currentIndex ? "#0D9488" : "#E5E7EB",
-              opacity: i <= currentIndex ? 1 : 0.4,
-            }}
-          />
-        ))}
-      </div>
+      {/* 진행 바 — 라운드 모드에서만 도트, 무한은 단일 게이지 */}
+      {!isInfinite ? (
+        <div style={styles.progressBar}>
+          {dailyQuizzes.map((_, i) => (
+            <div
+              key={i}
+              style={{
+                ...styles.progressDot,
+                backgroundColor: i <= currentIndex ? "#0D9488" : "#E5E7EB",
+                opacity: i <= currentIndex ? 1 : 0.4,
+              }}
+            />
+          ))}
+        </div>
+      ) : (
+        <div style={styles.infiniteBar}>
+          <span>♾️ 무한 모드</span>
+          <span>✅ {score}정답 · ⭐ {totalPoints}점</span>
+        </div>
+      )}
 
       {/* 카테고리 */}
       <div style={styles.badges}>
         <span style={styles.categoryBadge}>{quiz.category}</span>
       </div>
 
-      {/* 질문 */}
-      <div style={styles.questionNumber}>{currentIndex + 1}/5</div>
+      {/* 질문 번호 */}
+      <div style={styles.questionNumber}>
+        {isInfinite ? `문제 ${currentIndex + 1}` : `${currentIndex + 1}/${QUESTIONS_PER_ROUND}`}
+      </div>
       <div style={styles.question}>{quiz.question}</div>
 
       {/* 선택지 */}
@@ -444,7 +488,8 @@ export default function QuizTab() {
                     setTimeout(() => setAdNotice(null), 2400);
                   }
                   setLives(MAX_LIVES);
-                  if (currentIndex < 4) {
+                  const lastIndex = isInfinite ? totalQuestions - 1 : QUESTIONS_PER_ROUND - 1;
+                  if (currentIndex < lastIndex) {
                     setCurrentIndex((i) => i + 1);
                     setSelected(null);
                   } else {
@@ -457,21 +502,50 @@ export default function QuizTab() {
               {adNotice && <div style={styles.adNotice}>{adNotice}</div>}
             </>
           ) : (
-            <button
-              style={styles.nextButton}
-              onClick={() => {
-                if (currentIndex < 4) {
-                  track.click("quiz_next_question", { from_index: currentIndex, score });
-                  setCurrentIndex((i) => i + 1);
-                  setSelected(null);
-                } else {
-                  track.click("quiz_finish_request", { score });
-                  setFinished(true);
-                }
-              }}
-            >
-              {currentIndex < 4 ? "다음 문제" : "결과 보기"}
-            </button>
+            <>
+              <button
+                style={styles.nextButton}
+                onClick={() => {
+                  const lastRoundIndex = QUESTIONS_PER_ROUND - 1;
+                  const lastPoolIndex = totalQuestions - 1;
+                  if (isInfinite) {
+                    if (currentIndex >= lastPoolIndex) {
+                      // 풀 끝까지 갔으면 결과로
+                      track.click("quiz_finish_request", { score, mode: "infinite", answered: currentIndex + 1 });
+                      setFinished(true);
+                    } else {
+                      track.click("quiz_next_question", { from_index: currentIndex, score, mode: "infinite" });
+                      setCurrentIndex((i) => i + 1);
+                      setSelected(null);
+                    }
+                  } else {
+                    if (currentIndex < lastRoundIndex) {
+                      track.click("quiz_next_question", { from_index: currentIndex, score });
+                      setCurrentIndex((i) => i + 1);
+                      setSelected(null);
+                    } else {
+                      track.click("quiz_finish_request", { score });
+                      setFinished(true);
+                    }
+                  }
+                }}
+              >
+                {isInfinite
+                  ? (currentIndex >= totalQuestions - 1 ? "결과 보기" : "다음 문제")
+                  : (currentIndex < QUESTIONS_PER_ROUND - 1 ? "다음 문제" : "결과 보기")}
+              </button>
+              {isInfinite && (
+                <button
+                  style={styles.stopInfiniteButton}
+                  onClick={() => {
+                    track.click("quiz_finish_request", { score, mode: "infinite", answered: currentIndex + 1, user_stopped: true });
+                    setFinished(true);
+                  }}
+                >
+                  여기서 그만하기
+                </button>
+              )}
+            </>
           )}
         </div>
       )}
@@ -495,7 +569,25 @@ const styles: Record<string, React.CSSProperties> = {
   },
   levelEmoji: { fontSize: "24px" },
   levelLabel: { flex: 1 },
+  levelTag: { fontSize: "11px", fontWeight: 700, opacity: 0.7, marginLeft: "6px" },
   levelCount: { fontSize: "13px", opacity: 0.7 },
+  infiniteBar: {
+    display: "flex", justifyContent: "space-between", alignItems: "center",
+    padding: "10px 14px", marginBottom: "16px",
+    backgroundColor: "#EDE9FE", color: "#5B21B6",
+    borderRadius: "12px", fontSize: "13px", fontWeight: 800,
+  },
+  stopInfiniteButton: {
+    width: "100%", padding: "12px", borderRadius: "12px", marginTop: "8px",
+    backgroundColor: "#F3F4F6", color: "#6B7280",
+    fontSize: "14px", fontWeight: 700, border: "none", cursor: "pointer",
+  },
+  shareResultButton: {
+    padding: "14px 32px", borderRadius: "12px",
+    backgroundColor: "#F0FDFA", color: "#0D9488",
+    fontSize: "15px", fontWeight: 800,
+    border: "1px solid #A7F3D0", cursor: "pointer",
+  },
   // Top bar
   topBar: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" },
   topRight: { display: "flex", alignItems: "center", gap: "8px" },
