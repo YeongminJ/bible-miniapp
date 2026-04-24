@@ -6,6 +6,7 @@ import { loadProfile, matchScore, type UserProfile } from "../lib/profile";
 import { useUser } from "../lib/UserContext";
 import { saveUserData } from "../lib/userStore";
 import { track } from "../lib/analytics";
+import { shareMessage } from "../lib/share";
 
 interface Prayer {
   id: number;
@@ -294,6 +295,20 @@ export default function PrayerTab() {
                   >
                     🎙️ 따라 읽기
                   </button>
+                  <button
+                    style={styles.shareButton}
+                    onClick={async () => {
+                      const msg = `🙏 오늘의 기도 · ${prayer.category}\n\n${prayer.title}\n\n${prayer.content}\n\n📖 ${prayer.relatedVerse}\n${prayer.relatedVerseText}`;
+                      const res = await shareMessage(msg);
+                      track.click("prayer_share", {
+                        prayer_id: prayer.id,
+                        category: prayer.category,
+                        ok: res.ok,
+                      });
+                    }}
+                  >
+                    📤 공유하기
+                  </button>
                   {!isRead && (
                     <button
                       style={styles.amenButton}
@@ -399,6 +414,14 @@ const styles: Record<string, React.CSSProperties> = {
     backgroundColor: "#F0FDFA", color: "#0D9488",
     fontSize: "15px", fontWeight: 700,
     border: "2px solid #0D9488",
+    cursor: "pointer", marginTop: "8px",
+    display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
+  },
+  shareButton: {
+    width: "100%", padding: "14px", borderRadius: "12px",
+    backgroundColor: "#F9FAFB", color: "#374151",
+    fontSize: "15px", fontWeight: 700,
+    border: "1px solid #E5E7EB",
     cursor: "pointer", marginTop: "8px",
     display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
   },

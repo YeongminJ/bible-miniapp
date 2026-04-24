@@ -14,8 +14,17 @@ const TABS: { key: Tab; label: string; icon: string }[] = [
   { key: "character", label: "인물", icon: "👤" },
 ];
 
+const LAST_TAB_KEY = "lastActiveTab.v1";
+const isTab = (v: unknown): v is Tab => v === "quiz" || v === "prayer" || v === "character";
+
 function AppContent() {
-  const [activeTab, setActiveTab] = useState<Tab>("quiz");
+  const [activeTab, setActiveTab] = useState<Tab>(() => {
+    try {
+      const saved = localStorage.getItem(LAST_TAB_KEY);
+      if (isTab(saved)) return saved;
+    } catch { /* ignore */ }
+    return "quiz";
+  });
   const { loading } = useUser();
   const [insets, setInsets] = useState(() => {
     try { return SafeAreaInsets.get(); }
@@ -35,6 +44,7 @@ function AppContent() {
 
   useEffect(() => {
     track.screen(`tab_${activeTab}`, { tab: activeTab });
+    try { localStorage.setItem(LAST_TAB_KEY, activeTab); } catch { /* ignore */ }
   }, [activeTab]);
 
   const topPad = Math.max(insets.top, 0);

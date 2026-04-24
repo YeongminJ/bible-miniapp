@@ -1,10 +1,36 @@
 import { useState, useEffect, useMemo } from "react";
-import { loadFullScreenAd, showFullScreenAd } from "@apps-in-toss/web-framework";
 import VerseAudio from "./VerseAudio";
 import { track } from "../lib/analytics";
+import { showInterstitialAd } from "../lib/ad";
+import { shareMessage } from "../lib/share";
 
-// TODO: 실제 앱인토스 콘솔에서 발급받은 광고 그룹 ID로 교체해주세요.
-const AD_GROUP_ID = "";
+// 닉네임 · 닮은 인물 이력 저장 키
+const NICKNAME_KEY = "userNickname.v1";
+const MATCH_HISTORY_KEY = "characterMatchHistory.v1";
+
+type MatchHistoryEntry = {
+  characterId: number;
+  name: string;
+  virtue: string;
+  nickname: string;
+  timestamp: number;
+};
+
+function loadNickname(): string {
+  try { return localStorage.getItem(NICKNAME_KEY) || ""; } catch { return ""; }
+}
+function saveNickname(v: string) {
+  try { localStorage.setItem(NICKNAME_KEY, v); } catch { /* ignore */ }
+}
+function loadMatchHistory(): MatchHistoryEntry[] {
+  try {
+    const raw = localStorage.getItem(MATCH_HISTORY_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+function saveMatchHistory(list: MatchHistoryEntry[]) {
+  try { localStorage.setItem(MATCH_HISTORY_KEY, JSON.stringify(list.slice(0, 20))); } catch { /* ignore */ }
+}
 
 interface Character {
   id: number;
@@ -103,6 +129,11 @@ export default function CharacterTab() {
   const [matchedChar, setMatchedChar] = useState<Character | null>(null);
   const [lastAnswerIndex, setLastAnswerIndex] = useState<number | null>(null);
   const [adLoading, setAdLoading] = useState(false);
+  const [nickname, setNickname] = useState(loadNickname);
+  const [history, setHistory] = useState<MatchHistoryEntry[]>(loadMatchHistory);
+  const [nicknameDraft, setNicknameDraft] = useState("");
+  const [editingNickname, setEditingNickname] = useState(false);
+  const [shareNotice, setShareNotice] = useState<string | null>(null);
 
   useEffect(() => {
     const base = import.meta.env.BASE_URL;
@@ -156,57 +187,17 @@ export default function CharacterTab() {
     setCurrentQuestion((i) => i - 1);
   }
 
-  function handleWatchAdAndFinish() {
+  async function handleWatchAdAndFinish() {
     if (!quizData || lastAnswerIndex === null) return;
     const finalAnswers = [...answers, lastAnswerIndex];
-
-    const canUseAd =
-      Boolean(AD_GROUP_ID) &&
-      typeof loadFullScreenAd?.isSupported === "function" &&
-      loadFullScreenAd.isSupported() &&
-      typeof showFullScreenAd?.isSupported === "function" &&
-      showFullScreenAd.isSupported();
-
-    if (!canUseAd) {
-      // 광고 미지원 환경: 바로 결과 공개
-      finishQuiz(finalAnswers);
-      return;
-    }
-
     setAdLoading(true);
-    let settled = false;
-    const finishOnce = () => {
-      if (settled) return;
-      settled = true;
-      setAdLoading(false);
-      finishQuiz(finalAnswers);
-    };
-
-    try {
-      loadFullScreenAd({
-        options: { adGroupId: AD_GROUP_ID },
-        onEvent: (event) => {
-          if (event.type === "loaded") {
-            showFullScreenAd({
-              options: { adGroupId: AD_GROUP_ID },
-              onEvent: (showEvent) => {
-                if (
-                  showEvent.type === "dismissed" ||
-                  showEvent.type === "failedToShow" ||
-                  showEvent.type === "userEarnedReward"
-                ) {
-                  finishOnce();
-                }
-              },
-              onError: () => finishOnce(),
-            });
-          }
-        },
-        onError: () => finishOnce(),
-      });
-    } catch {
-      finishOnce();
-    }
+    const result = await showInterstitialAd();
+    track.impression("character_quiz_ad_result", {
+      shown: result.shown,
+      reason: result.shown ? "dismissed" : result.reason,
+    });
+    setAdLoading(false);
+    finishQuiz(finalAnswers);
   }
 
   function finishQuiz(finalAnswers: number[]) {
@@ -246,7 +237,36 @@ export default function CharacterTab() {
         name: best.name,
         virtue: best.keyVirtue,
       });
+      const entry: MatchHistoryEntry = {
+        characterId: best.id,
+        name: best.name,
+        virtue: best.keyVirtue,
+        nickname,
+        timestamp: Date.now(),
+      };
+      const next = [entry, ...history].slice(0, 20);
+      setHistory(next);
+      saveMatchHistory(next);
     }
+  }
+
+  async function shareMatchResult(char: Character) {
+    const who = nickname ? `${nickname}님` : "나";
+    const message = `${who}의 가장 닮은 성경 인물은 "${char.name} (${char.title})" 입니다!\n\n${char.summary}\n\n나도 테스트 하러 가기 👉`;
+    const res = await shareMessage(message);
+    track.click("character_match_share", { character_id: char.id, name: char.name, ok: res.ok });
+    if (!res.ok) {
+      setShareNotice("공유 기능을 지원하지 않는 환경이에요.");
+      setTimeout(() => setShareNotice(null), 2500);
+    }
+  }
+
+  function handleNicknameSave() {
+    const v = nicknameDraft.trim().slice(0, 12);
+    setNickname(v);
+    saveNickname(v);
+    setEditingNickname(false);
+    track.click("character_nickname_save", { has_value: Boolean(v) });
   }
 
   function resetQuiz() {
@@ -387,15 +407,50 @@ export default function CharacterTab() {
   }
 
   // ============ 목록 화면 ============
+  // 이전 매칭 이력 최신값 — intro에서 인물 카드 보여주고 '오늘의 말씀' 연동
+  const lastMatch = history[0];
+  const lastChar = lastMatch ? characters.find((c) => c.id === lastMatch.characterId) : null;
+
   return (
     <div style={styles.container}>
+      {/* 이전 닮은 인물 배너 + 오늘의 말씀 */}
+      {lastChar && quizPhase === "intro" && (
+        <button
+          style={styles.lastMatchCard}
+          onClick={() => {
+            track.click("character_last_match_open", { character_id: lastChar.id });
+            setSelectedChar(lastChar);
+          }}
+        >
+          <div style={styles.lastMatchHeader}>
+            <span style={styles.lastMatchTag}>⭐ {lastMatch?.nickname ? `${lastMatch.nickname}님과` : "나와"} 닮은 인물</span>
+            <span style={styles.lastMatchMore}>자세히 ›</span>
+          </div>
+          <div style={styles.lastMatchRow}>
+            <img
+              src={getCharacterImageUrl(lastChar.id)}
+              alt={lastChar.name}
+              style={styles.lastMatchImage}
+              onError={(e) => { (e.currentTarget as HTMLImageElement).style.visibility = "hidden"; }}
+            />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={styles.lastMatchName}>{lastChar.name} · {lastChar.title}</div>
+              <div style={styles.lastMatchVerseRef}>📖 {lastChar.keyVerse}</div>
+              <div style={styles.lastMatchVerseText}>{lastChar.keyVerseText}</div>
+            </div>
+          </div>
+        </button>
+      )}
+
       {/* 매칭 퀴즈 섹션 */}
       {quizData && (
         <div style={styles.quizWrap}>
           {quizPhase === "intro" && (
             <div style={styles.quizIntro}>
               <div style={styles.quizSparkle}>✨</div>
-              <div style={styles.quizTitle}>나와 닮은 성경 인물은 누구일까?</div>
+              <div style={styles.quizTitle}>
+                {lastChar ? "다시 한 번 닮은 인물을 찾아볼까요?" : "나와 닮은 성경 인물은 누구일까?"}
+              </div>
               <div style={styles.quizDesc}>
                 {quizData.questions.length}가지 질문으로 나와 가장 닮은 인물을 찾아보세요
               </div>
@@ -406,7 +461,7 @@ export default function CharacterTab() {
                   startQuiz();
                 }}
               >
-                시작하기
+                {lastChar ? "다시 하기" : "시작하기"}
               </button>
             </div>
           )}
@@ -477,7 +532,9 @@ export default function CharacterTab() {
               ...styles.quizResult,
               background: `linear-gradient(160deg, ${(ERA_COLORS[matchedChar.era] || ["#374151", "#6B7280"])[0]}, ${(ERA_COLORS[matchedChar.era] || ["#374151", "#6B7280"])[1]})`,
             }}>
-              <div style={styles.quizResultLabel}>나와 가장 닮은 인물</div>
+              <div style={styles.quizResultLabel}>
+                {nickname ? `${nickname}님과` : "나와"} 가장 닮은 인물
+              </div>
               <img
                 src={getCharacterImageUrl(matchedChar.id)}
                 alt={matchedChar.name}
@@ -489,7 +546,41 @@ export default function CharacterTab() {
                 {getVirtueIcon(matchedChar.keyVirtue)} {matchedChar.keyVirtue}
               </div>
               <div style={styles.quizResultSummary}>{matchedChar.summary}</div>
+
+              {/* 닉네임 입력/수정 */}
+              <div style={styles.nicknameBox}>
+                {editingNickname ? (
+                  <div style={{ display: "flex", gap: "6px", width: "100%" }}>
+                    <input
+                      autoFocus
+                      value={nicknameDraft}
+                      onChange={(e) => setNicknameDraft(e.target.value)}
+                      placeholder="닉네임 (최대 12자)"
+                      maxLength={12}
+                      style={styles.nicknameInput}
+                    />
+                    <button style={styles.nicknameSaveBtn} onClick={handleNicknameSave}>저장</button>
+                  </div>
+                ) : (
+                  <button
+                    style={styles.nicknameEdit}
+                    onClick={() => {
+                      setNicknameDraft(nickname);
+                      setEditingNickname(true);
+                    }}
+                  >
+                    {nickname ? `✏️ ${nickname}` : "✏️ 닉네임 설정하기"}
+                  </button>
+                )}
+              </div>
+
               <div style={styles.quizResultButtons}>
+                <button
+                  style={styles.quizResultShareBtn}
+                  onClick={() => shareMatchResult(matchedChar)}
+                >
+                  📤 공유하기
+                </button>
                 <button
                   style={styles.quizResultDetailBtn}
                   onClick={() => {
@@ -512,6 +603,7 @@ export default function CharacterTab() {
                   다시 하기
                 </button>
               </div>
+              {shareNotice && <div style={styles.shareNotice}>{shareNotice}</div>}
             </div>
           )}
         </div>
@@ -735,6 +827,64 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: "13px", fontWeight: 800,
     border: "1px solid rgba(255,255,255,0.3)", cursor: "pointer",
   },
+  // Nickname / Share
+  nicknameBox: {
+    marginTop: "14px", marginBottom: "4px",
+    display: "flex", justifyContent: "center",
+  },
+  nicknameEdit: {
+    padding: "8px 16px", borderRadius: "100px",
+    backgroundColor: "rgba(255,255,255,0.18)",
+    color: "#FFFFFF", fontSize: "13px", fontWeight: 700,
+    border: "1px solid rgba(255,255,255,0.3)", cursor: "pointer",
+  },
+  nicknameInput: {
+    flex: 1, padding: "10px 14px", borderRadius: "12px",
+    border: "1px solid rgba(255,255,255,0.5)",
+    backgroundColor: "rgba(255,255,255,0.95)",
+    fontSize: "14px", fontWeight: 600, color: "#111827",
+  },
+  nicknameSaveBtn: {
+    padding: "10px 16px", borderRadius: "12px",
+    backgroundColor: "#FFFFFF", color: "#0F766E",
+    fontSize: "13px", fontWeight: 800, border: "none", cursor: "pointer",
+  },
+  quizResultShareBtn: {
+    padding: "10px 20px", borderRadius: "100px",
+    backgroundColor: "#FFFFFF", color: "#0F766E",
+    fontSize: "14px", fontWeight: 800, border: "none", cursor: "pointer",
+  },
+  shareNotice: {
+    marginTop: "10px", padding: "8px 12px", borderRadius: "10px",
+    backgroundColor: "rgba(255,255,255,0.2)", color: "#FFFFFF",
+    fontSize: "12px", fontWeight: 600,
+  },
+  // Last match banner
+  lastMatchCard: {
+    width: "100%", padding: "14px 16px", marginBottom: "14px",
+    backgroundColor: "#FFFFFF", borderRadius: "18px",
+    border: "1px solid #E6F4F1", cursor: "pointer",
+    boxShadow: "0 2px 10px rgba(13,148,136,0.08)",
+    display: "flex", flexDirection: "column" as const, gap: "10px",
+    textAlign: "left" as const,
+  },
+  lastMatchHeader: { display: "flex", justifyContent: "space-between", alignItems: "center" },
+  lastMatchTag: { fontSize: "12px", fontWeight: 800, color: "#0D9488", letterSpacing: "0.3px" },
+  lastMatchMore: { fontSize: "12px", fontWeight: 700, color: "#9CA3AF" },
+  lastMatchRow: { display: "flex", gap: "12px", alignItems: "center" },
+  lastMatchImage: {
+    width: "56px", height: "56px", borderRadius: "50%",
+    objectFit: "cover" as const, flexShrink: 0,
+    border: "2px solid #F0FDFA",
+  },
+  lastMatchName: { fontSize: "15px", fontWeight: 800, color: "#111827", marginBottom: "4px" },
+  lastMatchVerseRef: { fontSize: "11px", fontWeight: 800, color: "#0D9488", letterSpacing: "0.3px", marginBottom: "2px" },
+  lastMatchVerseText: {
+    fontSize: "13px", color: "#374151", lineHeight: 1.4,
+    overflow: "hidden", display: "-webkit-box",
+    WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const,
+  },
+
   // Detail
   backButton: {
     padding: "8px 16px", fontSize: "14px", fontWeight: 600,
