@@ -415,31 +415,49 @@ export default function CharacterTab() {
     <div style={styles.container}>
       {/* 이전 닮은 인물 배너 + 오늘의 말씀 */}
       {lastChar && quizPhase === "intro" && (
-        <button
-          style={styles.lastMatchCard}
-          onClick={() => {
-            track.click("character_last_match_open", { character_id: lastChar.id });
-            setSelectedChar(lastChar);
-          }}
-        >
+        <div style={styles.lastMatchCard}>
           <div style={styles.lastMatchHeader}>
             <span style={styles.lastMatchTag}>⭐ {lastMatch?.nickname ? `${lastMatch.nickname}님과` : "나와"} 닮은 인물</span>
-            <span style={styles.lastMatchMore}>자세히 ›</span>
           </div>
-          <div style={styles.lastMatchRow}>
-            <img
-              src={getCharacterImageUrl(lastChar.id)}
-              alt={lastChar.name}
-              style={styles.lastMatchImage}
-              onError={(e) => { (e.currentTarget as HTMLImageElement).style.visibility = "hidden"; }}
-            />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={styles.lastMatchName}>{lastChar.name} · {lastChar.title}</div>
-              <div style={styles.lastMatchVerseRef}>📖 {lastChar.keyVerse}</div>
-              <div style={styles.lastMatchVerseText}>{lastChar.keyVerseText}</div>
+          <button
+            style={styles.lastMatchInner}
+            onClick={() => {
+              track.click("character_last_match_open", { character_id: lastChar.id });
+              setSelectedChar(lastChar);
+            }}
+          >
+            <div style={styles.lastMatchRow}>
+              <img
+                src={getCharacterImageUrl(lastChar.id)}
+                alt={lastChar.name}
+                style={styles.lastMatchImage}
+                onError={(e) => { (e.currentTarget as HTMLImageElement).style.visibility = "hidden"; }}
+              />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={styles.lastMatchName}>{lastChar.name} · {lastChar.title}</div>
+                <div style={styles.lastMatchVerseRef}>📖 {lastChar.keyVerse}</div>
+                <div style={styles.lastMatchVerseText}>{lastChar.keyVerseText}</div>
+              </div>
             </div>
+          </button>
+          <div style={styles.lastMatchActions}>
+            <button
+              style={styles.lastMatchShareBtn}
+              onClick={() => shareMatchResult(lastChar)}
+            >
+              📤 공유하기
+            </button>
+            <button
+              style={styles.lastMatchDetailBtn}
+              onClick={() => {
+                track.click("character_last_match_open", { character_id: lastChar.id, via: "detail_button" });
+                setSelectedChar(lastChar);
+              }}
+            >
+              자세히 보기 ›
+            </button>
           </div>
-        </button>
+        </div>
       )}
 
       {/* 매칭 퀴즈 섹션 */}
@@ -863,15 +881,33 @@ const styles: Record<string, React.CSSProperties> = {
   lastMatchCard: {
     width: "100%", padding: "14px 16px", marginBottom: "14px",
     backgroundColor: "#FFFFFF", borderRadius: "18px",
-    border: "1px solid #E6F4F1", cursor: "pointer",
+    border: "1px solid #E6F4F1",
     boxShadow: "0 2px 10px rgba(13,148,136,0.08)",
     display: "flex", flexDirection: "column" as const, gap: "10px",
     textAlign: "left" as const,
   },
+  lastMatchInner: {
+    background: "transparent", border: "none", padding: 0,
+    width: "100%", cursor: "pointer", textAlign: "left" as const,
+  },
   lastMatchHeader: { display: "flex", justifyContent: "space-between", alignItems: "center" },
   lastMatchTag: { fontSize: "12px", fontWeight: 800, color: "#0D9488", letterSpacing: "0.3px" },
-  lastMatchMore: { fontSize: "12px", fontWeight: 700, color: "#9CA3AF" },
   lastMatchRow: { display: "flex", gap: "12px", alignItems: "center" },
+  lastMatchActions: {
+    display: "flex", gap: "8px", marginTop: "2px",
+  },
+  lastMatchShareBtn: {
+    flex: 1, padding: "10px 12px", borderRadius: "12px",
+    backgroundColor: "#0D9488", color: "#FFFFFF",
+    fontSize: "13px", fontWeight: 800,
+    border: "none", cursor: "pointer",
+  },
+  lastMatchDetailBtn: {
+    flex: 1, padding: "10px 12px", borderRadius: "12px",
+    backgroundColor: "#F0FDFA", color: "#0D9488",
+    fontSize: "13px", fontWeight: 800,
+    border: "1px solid #A7F3D0", cursor: "pointer",
+  },
   lastMatchImage: {
     width: "56px", height: "56px", borderRadius: "50%",
     objectFit: "cover" as const, flexShrink: 0,
