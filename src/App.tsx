@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { SafeAreaInsets } from "@apps-in-toss/web-framework";
+import { SafeAreaInsets, getSchemeUri } from "@apps-in-toss/web-framework";
 import QuizTab from "./components/QuizTab";
 import PrayerTab from "./components/PrayerTab";
 import CharacterTab from "./components/CharacterTab";
@@ -18,8 +18,39 @@ const TABS: { key: Tab; label: string; icon: string }[] = [
 const LAST_TAB_KEY = "lastActiveTab.v1";
 const isTab = (v: unknown): v is Tab => v === "quiz" || v === "prayer" || v === "character";
 
+// 앱인토스 콘솔의 "앱 내 기능" 진입 스킴 또는 브라우저 URL을 해석해 초기 탭 결정
+// 지원 형식:
+//   - intoss-private://bible-mini/quiz | /prayer | /character
+//   - intoss-private://bible-mini?tab=quiz
+//   - https://.../app?tab=prayer
+function getInitialTabFromScheme(): Tab | null {
+  let raw = "";
+  try { raw = (getSchemeUri?.() ?? "") as string; } catch { /* ignore */ }
+  if (!raw && typeof window !== "undefined") raw = window.location.href ?? "";
+  if (!raw) return null;
+
+  // 1) 쿼리 ?tab=
+  const qIdx = raw.indexOf("?");
+  if (qIdx >= 0) {
+    try {
+      const qs = new URLSearchParams(raw.slice(qIdx + 1));
+      const t = qs.get("tab");
+      if (isTab(t)) return t;
+    } catch { /* ignore */ }
+  }
+
+  // 2) path segment
+  const lower = raw.toLowerCase();
+  if (/\/(quiz|q)(?=$|[/?#])/i.test(lower)) return "quiz";
+  if (/\/(prayer|p)(?=$|[/?#])/i.test(lower)) return "prayer";
+  if (/\/(character|c|people|person)(?=$|[/?#])/i.test(lower)) return "character";
+  return null;
+}
+
 function AppContent() {
   const [activeTab, setActiveTab] = useState<Tab>(() => {
+    const fromScheme = getInitialTabFromScheme();
+    if (fromScheme) return fromScheme;
     try {
       const saved = localStorage.getItem(LAST_TAB_KEY);
       if (isTab(saved)) return saved;
