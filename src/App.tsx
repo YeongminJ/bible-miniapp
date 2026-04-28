@@ -4,6 +4,7 @@ import QuizTab from "./components/QuizTab";
 import PrayerTab from "./components/PrayerTab";
 import CharacterTab from "./components/CharacterTab";
 import DailyVerse from "./components/DailyVerse";
+import DailyHeader from "./components/DailyHeader";
 import { UserProvider, useUser } from "./lib/UserContext";
 import { track } from "./lib/analytics";
 
@@ -102,6 +103,7 @@ function AppContent() {
           paddingBottom: `calc(70px + ${bottomPad}px)`,
         }}
       >
+        <DailyHeader />
         <DailyVerse />
         {activeTab === "quiz" && <QuizTab />}
         {activeTab === "prayer" && <PrayerTab />}

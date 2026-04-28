@@ -3,6 +3,7 @@ import VerseAudio from "./VerseAudio";
 import { showInterstitialAd } from "../lib/ad";
 import { track } from "../lib/analytics";
 import { shareMessage } from "../lib/share";
+import { completeMission } from "../lib/missions";
 
 const MAX_LIVES = 2;
 const QUESTIONS_PER_ROUND = 5;
@@ -411,6 +412,7 @@ export default function QuizTab() {
                 setSelected(i);
                 const correct = i === quiz.answer;
                 if (correct) {
+                  completeMission("quiz");
                   const newStreak = streak + 1;
                   setStreak(newStreak);
                   setScore((s) => s + 1);

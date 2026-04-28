@@ -7,6 +7,7 @@ import { useUser } from "../lib/UserContext";
 import { saveUserData } from "../lib/userStore";
 import { track } from "../lib/analytics";
 import { shareMessage } from "../lib/share";
+import { completeMission } from "../lib/missions";
 
 interface Prayer {
   id: number;
@@ -99,6 +100,7 @@ export default function PrayerTab() {
     const updated = getReadPrayers();
     setReadIds(updated);
     saveUserData({ readPrayers: [...updated] });
+    completeMission("prayer");
     const prayer = prayers.find((p) => p.id === prayerId);
     track.click("prayer_amen", {
       prayer_id: prayerId,

@@ -3,6 +3,7 @@ import { getSchemeUri } from "@apps-in-toss/web-framework";
 import { getAudioUrlFromRef } from "../utils/audioUrl";
 import { track } from "../lib/analytics";
 import { shareMessage } from "../lib/share";
+import { completeMission } from "../lib/missions";
 
 interface Prayer {
   id: number;
@@ -102,6 +103,7 @@ export default function DailyVerse() {
     audio.onerror = () => { stopAudio(); };
     audio.play().catch(() => stopAudio());
     track.click("daily_verse_play", { reference: verse.reference, voice });
+    completeMission("verse");
   };
 
   const toggleVoice = () => {
