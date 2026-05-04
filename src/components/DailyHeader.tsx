@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { tickStreak, type StreakState } from "../lib/streak";
 import { getMissions, missionsDoneCount, type MissionsState, type MissionId } from "../lib/missions";
+import { loadNotifySettings, type NotifySettings } from "../lib/notify-settings";
 import { track } from "../lib/analytics";
+import NotifySettingsModal from "./NotifySettingsModal";
 
 const MISSION_DEFS: Array<{ id: MissionId; icon: string; title: string; desc: string }> = [
   { id: "verse", icon: "📖", title: "오늘의 말씀 듣기", desc: "상단 오늘의 말씀에서 ▶ 재생" },
@@ -12,7 +14,9 @@ const MISSION_DEFS: Array<{ id: MissionId; icon: string; title: string; desc: st
 export default function DailyHeader() {
   const [streak, setStreak] = useState<StreakState>(() => ({ count: 0, lastDate: "", longest: 0 }));
   const [missions, setMissions] = useState<MissionsState>(() => getMissions());
+  const [notify, setNotify] = useState<NotifySettings>(() => loadNotifySettings());
   const [open, setOpen] = useState(false);
+  const [notifyOpen, setNotifyOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -20,7 +24,12 @@ export default function DailyHeader() {
     const refresh = () => setMissions(getMissions());
     refresh();
     window.addEventListener("missions:changed", refresh);
-    return () => window.removeEventListener("missions:changed", refresh);
+    const refreshNotify = () => setNotify(loadNotifySettings());
+    window.addEventListener("notifySettings:changed", refreshNotify);
+    return () => {
+      window.removeEventListener("missions:changed", refresh);
+      window.removeEventListener("notifySettings:changed", refreshNotify);
+    };
   }, []);
 
   // 외부 클릭 시 닫기
@@ -48,6 +57,17 @@ export default function DailyHeader() {
           <span style={styles.streakUnit}>일 연속</span>
         </div>
         <button
+          style={{ ...styles.notifyBtn, ...(notify.enabled ? styles.notifyBtnOn : {}) }}
+          onClick={() => {
+            setNotifyOpen(true);
+            track.click("notify_settings_open", { enabled: notify.enabled });
+          }}
+          aria-label="알림 설정"
+        >
+          🔔
+          {notify.enabled && <span style={styles.notifyDot} />}
+        </button>
+        <button
           style={{ ...styles.missionBtn, ...(allDone ? styles.missionBtnDone : {}) }}
           onClick={() => {
             const next = !open;
@@ -63,6 +83,7 @@ export default function DailyHeader() {
         </button>
       </div>
 
+      <NotifySettingsModal open={notifyOpen} onClose={() => setNotifyOpen(false)} />
       {open && (
         <div style={styles.panel}>
           {MISSION_DEFS.map((m) => {
@@ -103,8 +124,24 @@ const styles: Record<string, React.CSSProperties> = {
   streakIcon: { fontSize: "13px" },
   streakNum: { fontSize: "13px", fontWeight: 900 },
   streakUnit: { fontSize: "11px", fontWeight: 700, opacity: 0.85 },
-  missionBtn: {
+  notifyBtn: {
     marginLeft: "auto",
+    width: "32px", height: "26px",
+    display: "inline-flex", alignItems: "center", justifyContent: "center",
+    padding: 0, borderRadius: "100px",
+    backgroundColor: "#F3F4F6", color: "#374151",
+    border: "1px solid #E5E7EB", cursor: "pointer",
+    fontSize: "14px", lineHeight: 1, position: "relative" as const,
+  },
+  notifyBtnOn: {
+    backgroundColor: "#ECFDF5", border: "1px solid #A7F3D0",
+  },
+  notifyDot: {
+    position: "absolute" as const, top: "-2px", right: "-2px",
+    width: "8px", height: "8px", borderRadius: "50%",
+    backgroundColor: "#10B981", border: "2px solid #FFFFFF",
+  },
+  missionBtn: {
     display: "flex", alignItems: "center", gap: "6px",
     padding: "5px 10px", borderRadius: "100px",
     backgroundColor: "#F3F4F6", color: "#374151",
