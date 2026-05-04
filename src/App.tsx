@@ -5,6 +5,8 @@ import PrayerTab from "./components/PrayerTab";
 import CharacterTab from "./components/CharacterTab";
 import DailyVerse from "./components/DailyVerse";
 import DailyHeader from "./components/DailyHeader";
+import OnboardingSheet from "./components/OnboardingSheet";
+import { hasOnboarded } from "./lib/onboarding";
 import { UserProvider, useUser } from "./lib/UserContext";
 import { track } from "./lib/analytics";
 
@@ -49,6 +51,7 @@ function getInitialTabFromScheme(): Tab | null {
 }
 
 function AppContent() {
+  const [showOnboarding, setShowOnboarding] = useState<boolean>(() => !hasOnboarded());
   const [activeTab, setActiveTab] = useState<Tab>(() => {
     const fromScheme = getInitialTabFromScheme();
     if (fromScheme) return fromScheme;
@@ -92,6 +95,10 @@ function AppContent() {
         </div>
       </div>
     );
+  }
+
+  if (showOnboarding) {
+    return <OnboardingSheet onDone={() => setShowOnboarding(false)} />;
   }
 
   return (
