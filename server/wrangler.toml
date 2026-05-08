@@ -1,0 +1,30 @@
+name = "bible-mini-noti-api"
+main = "src/index.ts"
+compatibility_date = "2026-04-29"
+compatibility_flags = ["nodejs_compat"]
+
+# 토스 API 모드 ("mock" | "real"). 템플릿 코드 채우면 "real"로 전환.
+[vars]
+TOSS_MODE = "mock"
+# 토스 콘솔에서 발급받은 templateSetCode를 채우세요.
+TOSS_TEMPLATE_DAILY = "bible-mini-bible_daily"
+TOSS_TEMPLATE_STREAK_WARN = ""
+
+# D1 (SQLite) 바인딩.
+# 처음 셋업 시 `wrangler d1 create bible-mini-noti-db`로 만든 뒤 출력된
+# database_id를 아래 빈 칸에 채워주세요.
+[[d1_databases]]
+binding = "DB"
+database_name = "bible-mini-noti-db"
+database_id = "f6ffebc0-96d4-48d4-b5f0-fab3a85247e6"
+migrations_dir = "drizzle/migrations"
+
+# Cron Trigger — 매 분 (UTC 기준이지만 KST 변환은 코드에서 처리).
+[triggers]
+crons = ["* * * * *"]
+
+# 토스 mTLS 인증서 바인딩.
+# 업로드: wrangler mtls-certificate upload --cert <crt> --key <key> --name bible-mini-toss
+[[mtls_certificates]]
+binding = "TOSS_CERT"
+certificate_id = "e5306fb5-ff9b-4413-b48f-e9f0c03e00c7"
