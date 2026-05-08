@@ -14,9 +14,17 @@ interface Props {
   onDone: () => void;
 }
 
+const FEATURES: { emoji: string; title: string; desc: string }[] = [
+  { emoji: "📖", title: "오늘의 말씀", desc: "매일 한 절의 말씀을 받아요." },
+  { emoji: "🙏", title: "맞춤 기도", desc: "상황별 기도와 묵상이 준비돼있어요." },
+  { emoji: "🎯", title: "성경 퀴즈", desc: "1분이면 풀 수 있는 데일리 퀴즈." },
+  { emoji: "🔔", title: "알림 리마인더", desc: "내가 정한 시각에 챙겨드려요." },
+];
+
 export default function OnboardingSheet({ onDone }: Props) {
   const initial = loadNotifySettings();
-  const [enabled, setEnabled] = useState<boolean>(initial.enabled);
+  // 첫 진입 시 알림 기본 ON. 사용자가 토글로 끌 수 있음.
+  const [enabled, setEnabled] = useState<boolean>(true);
   const [times, setTimes] = useState<NotifyTime[]>(
     initial.times.length > 0 ? initial.times : ["10:00", "20:00"]
   );
@@ -64,6 +72,18 @@ export default function OnboardingSheet({ onDone }: Props) {
           <div style={styles.heroEmoji}>📖</div>
           <h1 style={styles.title}>오늘의 말씀</h1>
           <p style={styles.subtitle}>매일 한 절의 말씀과 기도, 짧은 묵상</p>
+        </div>
+
+        <div style={styles.featureList}>
+          {FEATURES.map((f) => (
+            <div key={f.title} style={styles.featureItem}>
+              <span style={styles.featureEmoji}>{f.emoji}</span>
+              <div style={{ flex: 1 }}>
+                <div style={styles.featureTitle}>{f.title}</div>
+                <div style={styles.featureDesc}>{f.desc}</div>
+              </div>
+            </div>
+          ))}
         </div>
 
         <button
@@ -124,10 +144,12 @@ export default function OnboardingSheet({ onDone }: Props) {
 
 const styles: Record<string, React.CSSProperties> = {
   overlay: {
+    // alignItems: center + 긴 콘텐츠 + overflowY:auto 조합은 위쪽이 잘리는 문제가 있어
+    // flex-start로 두고 자연 스크롤. justifyContent center로 가로만 가운데 정렬.
     position: "fixed", inset: 0, zIndex: 1500,
     backgroundColor: "#FFFFFF",
-    display: "flex", alignItems: "center", justifyContent: "center",
-    padding: "calc(env(safe-area-inset-top, 0px) + 16px) 16px calc(env(safe-area-inset-bottom, 0px) + 16px)",
+    display: "flex", alignItems: "flex-start", justifyContent: "center",
+    padding: "calc(env(safe-area-inset-top, 0px) + 24px) 16px calc(env(safe-area-inset-bottom, 0px) + 24px)",
     overflowY: "auto",
   },
   card: {
@@ -144,6 +166,24 @@ const styles: Record<string, React.CSSProperties> = {
     letterSpacing: "-0.8px", margin: "0 0 6px",
   },
   subtitle: { fontSize: "14px", color: "#6B7280", margin: 0, lineHeight: 1.5 },
+
+  featureList: {
+    display: "flex", flexDirection: "column" as const, gap: "10px",
+    backgroundColor: "#F9FAFB", borderRadius: "16px",
+    padding: "14px 16px",
+  },
+  featureItem: {
+    display: "flex", alignItems: "center", gap: "12px",
+  },
+  featureEmoji: {
+    fontSize: "22px", width: "32px", textAlign: "center" as const,
+  },
+  featureTitle: {
+    fontSize: "14px", fontWeight: 800, color: "#111827", marginBottom: "2px",
+  },
+  featureDesc: {
+    fontSize: "12px", color: "#6B7280", lineHeight: 1.4,
+  },
 
   toggleRow: {
     display: "flex", alignItems: "center", gap: "12px",

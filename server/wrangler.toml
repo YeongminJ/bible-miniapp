@@ -5,9 +5,10 @@ compatibility_flags = ["nodejs_compat"]
 
 # 토스 API 모드 ("mock" | "real"). 템플릿 코드 채우면 "real"로 전환.
 [vars]
-TOSS_MODE = "mock"
-# 토스 콘솔에서 발급받은 templateSetCode를 채우세요.
-TOSS_TEMPLATE_DAILY = "bible-mini-bible_daily"
+TOSS_MODE = "real"
+# 토스 콘솔에서 발급받은 templateSetCode (스마트 발송 → 캠페인 → 발송 코드).
+TOSS_TEMPLATE_DAILY = "bible-mini-daily-noti"
+# 스트릭 경고는 아직 미등록 — 빈 문자열이면 cron이 streak_warn 발송 시도 시 실패하고 daily만 정상.
 TOSS_TEMPLATE_STREAK_WARN = ""
 
 # D1 (SQLite) 바인딩.

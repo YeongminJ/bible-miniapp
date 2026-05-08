@@ -8,6 +8,8 @@ import type { Env } from "../env";
 
 const TOKEN_URL =
   "https://apps-in-toss-api.toss.im/api-partner/v1/apps-in-toss/user/oauth2/generate-token";
+const LOGIN_ME_URL =
+  "https://apps-in-toss-api.toss.im/api-partner/v1/apps-in-toss/user/oauth2/login-me";
 
 const exchangeSchema = z.object({
   authorizationCode: z.string().min(1),
@@ -25,45 +27,110 @@ const migrationLinkSchema = z.object({
 });
 
 interface TossTokenResponse {
-  resultType?: "SUCCESS" | string;
-  result?: {
+  resultType?: "SUCCESS" | "FAIL" | string;
+  // 실제 응답은 `success` 필드. (구 문서 캐시에 result로 잘못 표기되어 있던 점 수정)
+  success?: {
     accessToken?: string;
     refreshToken?: string;
-    userKey?: string | number;
     scope?: string;
     tokenType?: string;
     expiresIn?: number;
   };
-  error?: { errorCode?: string; reason?: string };
+  error?: { errorCode?: string; reason?: string } | string;
 }
 
-/** 토스 OAuth 인가코드 → userKey 교환. 실패 시 null 반환. */
+interface TossLoginMeResponse {
+  resultType?: "SUCCESS" | "FAIL" | string;
+  success?: {
+    userKey?: number | string;
+    scope?: string;
+    agreedTerms?: string[];
+  };
+  error?: { errorCode?: string; reason?: string } | string;
+}
+
+/**
+ * 토스 OAuth 2단계 교환:
+ *   1) generate-token: authorizationCode → accessToken
+ *   2) login-me: accessToken → userKey
+ *
+ * `userKey`를 받으려면 콘솔에서 OAuth scope에 `user_key`가 포함돼있고
+ * 사용자가 동의해야 해요. 미인가 상태면 토스가 userKey를 안 주고 흐름이 실패.
+ */
 async function exchangeWithToss(
   cert: Fetcher,
   authorizationCode: string,
   referrer: string,
 ): Promise<{ userKey: string } | { error: string; status: number }> {
-  let res: Response;
+  // ── 1) generate-token ───────────────────────────────────────────
+  let tokenRes: Response;
   try {
-    res = await cert.fetch(TOKEN_URL, {
+    tokenRes = await cert.fetch(TOKEN_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ authorizationCode, referrer }),
     });
   } catch (err) {
+    console.error("[toss-oauth] generate-token fetch threw", err);
     return {
       error: err instanceof Error ? err.message : String(err),
       status: 502,
     };
   }
-  const data = (await res.json().catch(() => null)) as TossTokenResponse | null;
-  if (!res.ok) {
-    return { error: `toss_oauth_http_${res.status}`, status: 502 };
+  const tokenData = (await tokenRes.json().catch(() => null)) as
+    | TossTokenResponse
+    | null;
+  const accessToken = tokenData?.success?.accessToken;
+  if (!tokenRes.ok || tokenData?.resultType !== "SUCCESS" || !accessToken) {
+    // 응답 본문은 accessToken 등 민감 정보 포함 가능 — error 부분만 추출해 로깅.
+    console.error(
+      "[toss-oauth] generate-token failed",
+      "http",
+      tokenRes.status,
+      "resultType",
+      tokenData?.resultType,
+      "error",
+      JSON.stringify(tokenData?.error ?? null),
+      "referrer",
+      referrer,
+    );
+    return { error: "toss_oauth_token_failed", status: 502 };
   }
-  if (data?.resultType !== "SUCCESS" || !data.result?.userKey) {
-    return { error: "toss_oauth_failed", status: 502 };
+
+  // ── 2) login-me ─────────────────────────────────────────────────
+  let meRes: Response;
+  try {
+    meRes = await cert.fetch(LOGIN_ME_URL, {
+      method: "GET",
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+  } catch (err) {
+    console.error("[toss-oauth] login-me fetch threw", err);
+    return {
+      error: err instanceof Error ? err.message : String(err),
+      status: 502,
+    };
   }
-  return { userKey: String(data.result.userKey) };
+  const meData = (await meRes.json().catch(() => null)) as
+    | TossLoginMeResponse
+    | null;
+  const userKey = meData?.success?.userKey;
+  if (!meRes.ok || meData?.resultType !== "SUCCESS" || userKey == null) {
+    // 사용자 PII (name/phone/birthday 등) 응답에 포함될 수 있음 — error 필드만 로깅.
+    console.error(
+      "[toss-oauth] login-me failed",
+      "http",
+      meRes.status,
+      "resultType",
+      meData?.resultType,
+      "error",
+      JSON.stringify(meData?.error ?? null),
+      "tokenScope",
+      tokenData.success?.scope,
+    );
+    return { error: "toss_login_me_failed", status: 502 };
+  }
+  return { userKey: String(userKey) };
 }
 
 const route = new Hono<{ Bindings: Env }>();

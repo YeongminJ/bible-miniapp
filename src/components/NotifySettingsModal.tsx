@@ -8,7 +8,7 @@ import {
 } from "../lib/notify-settings";
 import { track } from "../lib/analytics";
 import { ensureUserKey } from "../lib/user-key";
-import { ensureMapped, subscribeNotify, unsubscribeNotify } from "../lib/notify-api";
+import { subscribeNotify, unsubscribeNotify } from "../lib/notify-api";
 
 interface Props {
   open: boolean;
@@ -29,13 +29,14 @@ export default function NotifySettingsModal({ open, onClose }: Props) {
     saveNotifySettings(next);
   };
 
-  // 서버 동기화: enabled + times[0] 기준으로 구독/해지
-  // 구독 시 토스 OAuth 매핑이 없으면 한 번만 appLogin → 매핑 저장 (이후엔 캐시).
+  // 서버 동기화: enabled + times[0] 기준으로 구독/해지.
+  // 토스 OAuth 매핑은 OnboardingSheet의 "시작하기"에서 한 번만 트리거 →
+  // 여기선 매핑 시도 안 함 (토글 시 토스 로그인 화면 갑자기 뜨는 거 방지).
+  // 매핑 안된 사용자라도 서버 row는 등록되지만 cron 발송 단계에서 skip돼요.
   const syncRemote = async (next: NotifySettings) => {
     const userKey = await ensureUserKey();
     if (!userKey) return;
     if (next.enabled && next.times.length > 0) {
-      await ensureMapped(userKey); // 실패해도 구독은 시도
       await subscribeNotify(userKey, next.times[0]);
     } else {
       await unsubscribeNotify(userKey);

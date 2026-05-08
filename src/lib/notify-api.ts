@@ -92,23 +92,33 @@ export async function createMapping(
  * 푸시 등록 직전에 호출. 매핑 안 되어있으면 `appLogin()` 트리거 → 서버에 매핑 저장.
  * 이미 매핑돼있거나 토스 로그인 미연동 미니앱이면 즉시 true 반환.
  *
+ * 동시 호출 보호: 진행 중이면 같은 promise 반환해서 `appLogin()` 두 번 뜨는 거 방지.
+ *
  * 반환:
- *  - true: 매핑 완료 (또는 이미 매핑됨, 또는 미연동 → 발송 불가지만 흐름은 정상)
- *  - false: appLogin 실패/거절 또는 서버 매핑 실패
+ *  - true: 매핑 완료 (또는 이미 매핑됨)
+ *  - false: appLogin 실패/거절 또는 서버 매핑 실패 (호출자는 구독은 그대로 진행해도 됨,
+ *           cron 발송 단계에서 toss_user_key 없는 사용자는 자동 skip)
  */
-export async function ensureMapped(hash: string): Promise<boolean> {
-  const { isMapped } = await checkMappingStatus(hash);
-  if (isMapped) return true;
+let _mappingInflight: Promise<boolean> | null = null;
+export function ensureMapped(hash: string): Promise<boolean> {
+  if (_mappingInflight) return _mappingInflight;
+  _mappingInflight = (async () => {
+    try {
+      const { isMapped } = await checkMappingStatus(hash);
+      if (isMapped) return true;
 
-  try {
-    const framework = await import("@apps-in-toss/web-framework");
-    // 토스 로그인 미연동 미니앱이면 OAuth 자체가 불가능 — 매핑 생략
-    if (!framework.appLogin) return false;
-    const { authorizationCode, referrer } = await framework.appLogin();
-    const { ok } = await createMapping(hash, authorizationCode, referrer);
-    return ok;
-  } catch (err) {
-    console.warn("[notify-api] ensureMapped failed", err);
-    return false;
-  }
+      const framework = await import("@apps-in-toss/web-framework");
+      if (!framework.appLogin) return false;
+
+      const { authorizationCode, referrer } = await framework.appLogin();
+      const { ok } = await createMapping(hash, authorizationCode, referrer);
+      return ok;
+    } catch (err) {
+      console.warn("[notify-api] ensureMapped failed", err);
+      return false;
+    } finally {
+      _mappingInflight = null;
+    }
+  })();
+  return _mappingInflight;
 }
