@@ -9,3 +9,14 @@ dist/
 
 # Dependencies
 node_modules/
+
+# Secrets (mTLS certificates etc.) — 절대 커밋 금지
+secrets/
+*.key
+*.crt
+*.pem
+*.p12
+*.pfx
+.env
+.env.local
+.env.*.local
