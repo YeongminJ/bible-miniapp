@@ -8,7 +8,7 @@ import {
 } from "../lib/notify-settings";
 import { track } from "../lib/analytics";
 import { ensureUserKey } from "../lib/user-key";
-import { subscribeNotify, unsubscribeNotify } from "../lib/notify-api";
+import { ensureMapped, subscribeNotify, unsubscribeNotify } from "../lib/notify-api";
 
 interface Props {
   open: boolean;
@@ -30,10 +30,12 @@ export default function NotifySettingsModal({ open, onClose }: Props) {
   };
 
   // 서버 동기화: enabled + times[0] 기준으로 구독/해지
+  // 구독 시 토스 OAuth 매핑이 없으면 한 번만 appLogin → 매핑 저장 (이후엔 캐시).
   const syncRemote = async (next: NotifySettings) => {
     const userKey = await ensureUserKey();
     if (!userKey) return;
     if (next.enabled && next.times.length > 0) {
+      await ensureMapped(userKey); // 실패해도 구독은 시도
       await subscribeNotify(userKey, next.times[0]);
     } else {
       await unsubscribeNotify(userKey);

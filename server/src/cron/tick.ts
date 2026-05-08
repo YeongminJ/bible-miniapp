@@ -50,10 +50,19 @@ export async function runTick(
   }
 
   // 2) 각 사용자별 발송 타입 결정
-  type Plan = { userKey: string; type: NotiType; streak: number };
+  // userKey = 클라 hash (DB row 식별자), tossUserKey = sendMessage 라우팅 키
+  type Plan = {
+    userKey: string;
+    tossUserKey: string;
+    type: NotiType;
+    streak: number;
+  };
   const plans: Plan[] = [];
 
   for (const u of candidates) {
+    // 토스 OAuth 매핑 안 된 사용자는 sendMessage 라우팅 불가 → skip
+    if (!u.tossUserKey) continue;
+
     const lastPlayedDate = u.lastPlayedAt
       ? kstDateFromEpoch(u.lastPlayedAt)
       : null;
@@ -70,12 +79,14 @@ export async function runTick(
     if (hasActiveStreak && u.streakWarnEnabled) {
       plans.push({
         userKey: u.userKey,
+        tossUserKey: u.tossUserKey,
         type: "streak_warn",
         streak: u.currentStreak,
       });
     } else if (u.dailyEnabled) {
       plans.push({
         userKey: u.userKey,
+        tossUserKey: u.tossUserKey,
         type: "daily",
         streak: u.currentStreak,
       });
@@ -128,7 +139,7 @@ export async function runTick(
     let result: { ok: boolean; error?: string };
     try {
       result = await toss.sendMessage({
-        userKey: plan.userKey,
+        userKey: plan.tossUserKey,
         type: plan.type,
         context: { streak: plan.streak },
       });

@@ -8,7 +8,7 @@ import {
 import { markOnboarded } from "../lib/onboarding";
 import { track } from "../lib/analytics";
 import { ensureUserKey } from "../lib/user-key";
-import { subscribeNotify } from "../lib/notify-api";
+import { ensureMapped, subscribeNotify } from "../lib/notify-api";
 
 interface Props {
   onDone: () => void;
@@ -47,8 +47,11 @@ export default function OnboardingSheet({ onDone }: Props) {
     });
     if (finalEnabled && times.length > 0) {
       // 워커가 단일 reminderMinute만 지원하므로 첫 번째(가장 이른) 시각만 등록
-      void ensureUserKey().then((userKey) => {
-        if (userKey) void subscribeNotify(userKey, times[0]);
+      // 토스 OAuth 매핑이 필요(푸시 라우팅 키 발급) — 매핑 후 구독.
+      void ensureUserKey().then(async (userKey) => {
+        if (!userKey) return;
+        await ensureMapped(userKey); // 실패해도 구독은 진행 (서버 row 생성용)
+        await subscribeNotify(userKey, times[0]);
       });
     }
     onDone();
