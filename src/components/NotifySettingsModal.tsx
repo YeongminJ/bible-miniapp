@@ -7,6 +7,8 @@ import {
   type NotifyTime,
 } from "../lib/notify-settings";
 import { track } from "../lib/analytics";
+import { ensureUserKey } from "../lib/user-key";
+import { subscribeNotify, unsubscribeNotify } from "../lib/notify-api";
 
 interface Props {
   open: boolean;
@@ -27,6 +29,17 @@ export default function NotifySettingsModal({ open, onClose }: Props) {
     saveNotifySettings(next);
   };
 
+  // 서버 동기화: enabled + times[0] 기준으로 구독/해지
+  const syncRemote = async (next: NotifySettings) => {
+    const userKey = await ensureUserKey();
+    if (!userKey) return;
+    if (next.enabled && next.times.length > 0) {
+      await subscribeNotify(userKey, next.times[0]);
+    } else {
+      await unsubscribeNotify(userKey);
+    }
+  };
+
   const toggleEnabled = () => {
     const enabling = !s.enabled;
     const next: NotifySettings = {
@@ -36,6 +49,7 @@ export default function NotifySettingsModal({ open, onClose }: Props) {
     };
     persist(next);
     track.click("notify_settings_toggle", { enabled: enabling, times: s.times.join(",") });
+    void syncRemote(next);
   };
 
   const toggleTime = (t: NotifyTime) => {
@@ -43,8 +57,10 @@ export default function NotifySettingsModal({ open, onClose }: Props) {
     let times = has ? s.times.filter((x) => x !== t) : [...s.times, t];
     times = times.sort();
     if (times.length === 0) times = [t]; // 최소 하나는 유지
-    persist({ ...s, times });
+    const next = { ...s, times };
+    persist(next);
     track.click("notify_settings_time_change", { time: t, enabled: !has, count: times.length });
+    if (next.enabled) void syncRemote(next);
   };
 
   return (
@@ -76,7 +92,7 @@ export default function NotifySettingsModal({ open, onClose }: Props) {
 
           {/* 시간 선택 */}
           <div style={styles.section}>
-            <div style={styles.sectionLabel}>알림 받을 시각 (다중 선택)</div>
+            <div style={styles.sectionLabel}>알림 받을 시각</div>
             <div style={styles.timeRow}>
               {TIME_OPTIONS.map((t) => {
                 const on = s.times.includes(t);

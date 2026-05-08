@@ -7,6 +7,8 @@ import {
 } from "../lib/notify-settings";
 import { markOnboarded } from "../lib/onboarding";
 import { track } from "../lib/analytics";
+import { ensureUserKey } from "../lib/user-key";
+import { subscribeNotify } from "../lib/notify-api";
 
 interface Props {
   onDone: () => void;
@@ -43,6 +45,12 @@ export default function OnboardingSheet({ onDone }: Props) {
       notify_enabled: finalEnabled,
       times: times.join(","),
     });
+    if (finalEnabled && times.length > 0) {
+      // 워커가 단일 reminderMinute만 지원하므로 첫 번째(가장 이른) 시각만 등록
+      void ensureUserKey().then((userKey) => {
+        if (userKey) void subscribeNotify(userKey, times[0]);
+      });
+    }
     onDone();
   };
 
