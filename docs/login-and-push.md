@@ -103,11 +103,14 @@ TOSS_TEMPLATE_STREAK_WARN = ""                      # 미사용 (캠페인 미�
 ```
 
 ### 3.3 D1 스키마 (`server/src/db/schema.ts`)
+
+v0.3에서 다중 reminder 지원 추가 — 사용자 한 명이 여러 시각(예: 10:00 + 20:00)을 등록할 수 있음.
+
 ```sql
 CREATE TABLE users (
   user_key             TEXT PRIMARY KEY,         -- 클라 hash
   toss_user_key        TEXT,                     -- 토스 OAuth userKey (NULL이면 푸시 라우팅 불가)
-  reminder_minute      INTEGER,                   -- KST 분 (0~1439), NULL이면 알림 비활성
+  reminder_minute      INTEGER,                   -- @deprecated (v0.x 호환용, 현재 코드 미사용)
   daily_enabled        INTEGER NOT NULL DEFAULT 1,
   streak_warn_enabled  INTEGER NOT NULL DEFAULT 1,
   last_played_at       INTEGER,                   -- 마지막 플레이 epoch ms
@@ -118,6 +121,16 @@ CREATE TABLE users (
 );
 CREATE INDEX users_toss_user_key_idx ON users (toss_user_key);
 
+-- v0.3 추가: 사용자당 다중 reminder 시각
+CREATE TABLE user_reminders (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_key    TEXT NOT NULL,
+  minute      INTEGER NOT NULL,                   -- KST 분 (0~1439), 600=10:00, 1200=20:00
+  created_at  INTEGER NOT NULL
+);
+CREATE UNIQUE INDEX user_reminders_user_minute_uniq ON user_reminders (user_key, minute);
+CREATE INDEX user_reminders_minute_idx ON user_reminders (minute);  -- cron WHERE minute=? 빠른 lookup
+
 CREATE TABLE notifications (
   id        INTEGER PRIMARY KEY AUTOINCREMENT,
   user_key  TEXT NOT NULL,
@@ -125,12 +138,16 @@ CREATE TABLE notifications (
   type      TEXT NOT NULL,                        -- 'daily' | 'streak_warn'
   status    TEXT NOT NULL,                        -- 'sent' | 'failed' | 'skipped'
   sent_at   INTEGER NOT NULL,
-  error     TEXT
+  error     TEXT,
+  minute    INTEGER                                -- v0.3 추가. 발송된 reminder의 분. 레거시 row는 NULL
 );
-CREATE UNIQUE INDEX notifications_user_date_type ON notifications (user_key, date, type);
+CREATE UNIQUE INDEX notifications_user_date_type_minute ON notifications (user_key, date, type, minute);
 ```
 
-`uniqueIndex`로 같은 (사용자, 날짜, 타입) 중복 발송 방지.
+**중요 동작 메모**:
+- `users.reminder_minute`은 더 이상 cron이 읽지 않음. v0.3 코드는 `user_reminders` 테이블을 JOIN.
+- `users.reminder_minute`은 호환성을 위해 남겨두되 `/api/users` POST 시 첫 reminder를 미러링 (다른 도구에서 단일 값으로 읽고 싶을 때 대응).
+- `notifications.minute`이 unique key의 일부 → 같은 날 사용자가 등록한 여러 시각마다 1건씩 sent 기록 가능. SQLite에서 NULL은 unique 제약상 distinct이므로 v0.x 레거시 row(minute=NULL)는 새 row와 충돌하지 않음.
 
 ### 3.4 API 엔드포인트
 
@@ -138,10 +155,10 @@ CREATE UNIQUE INDEX notifications_user_date_type ON notifications (user_key, dat
 | -------- | ----------------------------- | ---- |
 | `POST`   | `/api/auth/migration/status`  | hash로 매핑 여부 조회 → `{ isMapped }` |
 | `POST`   | `/api/auth/migration/link`    | 인가코드 → mTLS OAuth 2단계 → `toss_user_key` 저장 |
-| `POST`   | `/api/users`                  | 사용자 upsert (구독: hash + reminderMinute) |
+| `POST`   | `/api/users`                  | 사용자 upsert + reminder 교체 (`{ userKey, reminders: number[] }`). `user_reminders`를 받은 배열로 replace-all. 빈 배열이면 모든 알림 비활성. `reminderMinute`(단일)도 호환성 유지. |
 | `PATCH`  | `/api/users/:hash/play`       | 플레이 기록 (스트릭 갱신) |
-| `DELETE` | `/api/users`                  | 구독 해지 (사용자 + 발송이력 삭제) |
-| `GET`    | `/api/users/:hash`            | 디버그용 사용자 조회 |
+| `DELETE` | `/api/users`                  | 구독 해지 (사용자 + reminders + 발송이력 모두 삭제) |
+| `GET`    | `/api/users/:hash`            | 디버그용 사용자 조회 (응답에 `reminders: number[]` 포함) |
 | `GET`    | `/api/health`                 | 헬스체크 |
 
 `/migration/exchange` 도 호환성을 위해 유지하지만 신규 흐름은 `/migration/link` 사용.
@@ -149,11 +166,11 @@ CREATE UNIQUE INDEX notifications_user_date_type ON notifications (user_key, dat
 ### 3.5 Cron 로직 (`server/src/cron/tick.ts`)
 
 매 분 실행:
-1. `users` 중 `reminder_minute == 현재 KST 분` 사용자 조회
+1. `user_reminders` 중 `minute == 현재 KST 분`인 row를 `users` JOIN으로 조회 (한 사용자가 같은 분에 중복 등록 불가능 → 각 row는 1:1로 사용자 후보)
 2. **`toss_user_key`가 NULL이면 skip** (라우팅 불가)
 3. `last_played_at` 의 KST 날짜 == 오늘이면 skip (이미 플레이)
 4. 어제 플레이 + `streak > 0` 이면 `streak_warn` 타입, 아니면 `daily` 타입
-5. `notifications` 에 같은 (사용자, 오늘 KST 날짜, 타입)으로 `sent` 있으면 skip
+5. `notifications` 에 같은 (사용자, 오늘 KST 날짜, 타입, **minute**)으로 `sent` 있으면 skip
 6. mTLS로 토스 `/messenger/send-message` 호출:
    ```
    POST /api-partner/v1/apps-in-toss/messenger/send-message
@@ -161,7 +178,9 @@ CREATE UNIQUE INDEX notifications_user_date_type ON notifications (user_key, dat
    { "templateSetCode": "bible-mini-daily-noti",
      "context": { "streak": 7 } }
    ```
-7. 결과를 `notifications` 에 `sent` / `failed` 로 기록
+7. 결과를 `notifications` 에 `sent` / `failed` 로 기록 (minute 컬럼에 발화 분 저장)
+
+> **다중 reminder 동작**: 사용자가 [10:00, 20:00] 등록 시 cron은 10:00 KST에 1번, 20:00 KST에 또 1번 발화. 각각 다른 (date, type, minute) 키로 dedup. 사용자가 10:00 발화 후 플레이를 마치고 20:00 cron이 돌 때는 `last_played_at == 오늘`이라 skip.
 
 ---
 
@@ -204,18 +223,79 @@ mTLS + Authorization: Bearer {accessToken}
 - [`src/lib/user-key.ts`](../src/lib/user-key.ts) — `ensureUserKey()` (anonymousKey 캐시)
 - [`src/lib/notify-settings.ts`](../src/lib/notify-settings.ts) — 알림 설정 localStorage (`notifySettings.v1`)
 - [`src/lib/notify-api.ts`](../src/lib/notify-api.ts) — 서버 호출 + `ensureMapped(hash)` 헬퍼
+- [`src/lib/mapping-cache.ts`](../src/lib/mapping-cache.ts) — `mappingVerified.v1` localStorage 플래그
 - [`src/lib/onboarding.ts`](../src/lib/onboarding.ts) — `onboarded.v1` 플래그
-- [`src/components/OnboardingSheet.tsx`](../src/components/OnboardingSheet.tsx) — 첫 진입 시트
+- [`src/components/OnboardingSheet.tsx`](../src/components/OnboardingSheet.tsx) — 첫 진입 시트(+ recovery 모드)
 - [`src/components/NotifySettingsModal.tsx`](../src/components/NotifySettingsModal.tsx) — 알림 설정 변경 시트
 
 ### 5.2 `ensureMapped(hash)` 호출 시점
-- **OnboardingSheet "시작하기"** 클릭 시 1회 → `appLogin()` 트리거
+- **OnboardingSheet "시작하기" / "알림 다시 연결하기"** 클릭 시 1회 → `appLogin()` 트리거
 - **NotifySettingsModal 토글**에서는 **호출 안 함** (사용자 의도 없는 OAuth 화면 방지)
   - 매핑 안된 사용자는 토글 ON 해도 `toss_user_key=NULL` 상태라 cron에서 skip
-  - 따라서 미매핑 사용자가 알림 받으려면 OnboardingSheet 단계에서 동의해야 함
+  - 매핑 복구가 필요한 케이스는 **§5.5 자동 복구 흐름**에서 별도 처리
 
 ### 5.3 동시 호출 보호
 `ensureMapped` 안에 **mutex(`_mappingInflight`)** 가 있어 같은 시점에 두 번 호출돼도 `appLogin()` 화면이 두 번 뜨지 않음.
+
+### 5.4 매핑 검증 캐시 (`mappingVerified.v1`)
+서버에서 한 번 `isMapped=true`로 확인되거나 `createMapping`이 성공하면 `localStorage.mappingVerified.v1 = "1"`. 다음 세션부터는 매핑 상태 체크 자체를 skip해서 불필요한 네트워크 호출 0회.
+
+설정/해제 위치:
+- **설정**: `checkMappingStatus(hash)` 가 `isMapped=true` 응답 받았을 때, 또는 `createMapping(...)` 성공 직후
+- **해제**: `unsubscribeNotify(...)` 가 200 응답 받았을 때 (다시 구독 시 재인증 필요)
+
+### 5.5 자동 복구 흐름 (broken state recovery)
+
+**문제**: 기존 유저가 OAuth 매핑 코드 추가 *전*에 온보딩을 끝냈거나 `appLogin()`이 silently 실패했던 경우 → `users.toss_user_key`가 NULL로 고립. 이후엔 `OnboardingSheet`도 안 뜨므로 `ensureMapped()`도 호출되지 않아 영영 매핑 안 됨.
+
+**감지 조건** (App.tsx 마운트 시 1회):
+1. `hasOnboarded() === true` (온보딩은 끝남)
+2. `isMappingVerified() === false` (검증 캐시 없음)
+3. `loadNotifySettings().enabled === true` (알림 받기로 한 의사 있음)
+4. `checkMappingStatus(hash)` 가 `{ ok: true, isMapped: false }` 명확한 응답 (네트워크 오류 ≠ 미매핑)
+
+**복구 동작**:
+1. `resetOnboarded()` → `onboarded.v1` 플래그 제거
+2. `setOnboardingMode("recovery")` + `setShowOnboarding(true)` → OnboardingSheet 다시 표시
+3. recovery 모드에서는 노란 배너 ("🔔 알림 연결을 마무리해 주세요") + 기능 소개 리스트 숨김 + 버튼 텍스트가 "알림 다시 연결하기" / "알림 끄기"
+4. 사용자 탭 → `ensureMapped()` → `appLogin()` (이미 동의한 사용자면 silent로 인가코드 발급) → `createMapping()` → 서버에 `toss_user_key` 저장 + `mappingVerified.v1` 캐시
+5. 다음 세션부터 자동 복구 체크는 skip
+
+**중요: 복구는 한 세션에 한 번만**
+
+[`App.tsx`](../src/App.tsx)의 `recoveryCheckedRef` ref가드가 있어 useEffect 의존성 변경(예: `showOnboarding` 토글)으로 재실행되어도 복구 로직은 다시 실행되지 않음. 이 가드가 없으면 사용자가 "알림 다시 연결하기" 탭하는 즉시 `onDone()` → `showOnboarding=false` → useEffect 재실행 → `checkMappingStatus`가 아직 매핑 진행 중이라 또 `{isMapped:false}` 응답 → 다시 `setShowOnboarding(true)` 무한 루프 발생.
+
+**증상**: 사용자가 "2-3회 탭해야 진입됨" / "토스 로그인 화면이 안 뜸" — 이는 루프 도중 `appLogin()`이 다른 마운트 사이클로 가려진 것.
+
+**네트워크 오류 안전장치**: `checkMappingStatus`가 `{ ok: false }` 반환(서버 타임아웃/오프라인 등)하면 절대 `resetOnboarded()` 호출 안 함. 비행기/지하철 환경에서 멀쩡한 유저를 잘못 reset하는 사고 방지.
+
+---
+
+## 5.6 사용자 이름 (`name`) — 암호화된 PII 처리
+
+**현 상태**: login-me 응답의 `name` 필드는 **AES-256-GCM 암호문(base64)** 으로 반환됨. 서버는 이를 평문화할 복호화 키가 없으므로 **저장하지 않음** ([server/src/routes/auth.ts](../server/src/routes/auth.ts) 의 `exchangeWithToss` 참조). 클라 공유 메시지는 항상 fallback 텍스트 사용 중.
+
+**이전 사고**: 클라 캐시 v1(`userName.v1`)에 암호문이 저장돼 공유 시 `LVeEJz26xKXmkrklPGrxWWImYGdLIjAg5hbd2uyfugEWxX/D8g==님과 가장 닮은 성경 인물은…` 처럼 gibberish가 노출됐었음. 캐시 키를 `userName.v2`로 bump + DB의 `users.name` 컬럼 wipe로 해결.
+
+**복호화를 활성화하려면** (운영 작업):
+
+1. 토스 콘솔 → 토스로 로그인 메뉴 → **복호화 키 + AAD 신청** → 이메일로 수령
+2. Worker secret 등록:
+   ```bash
+   cd server
+   npx wrangler secret put TOSS_LOGIN_DECRYPT_KEY
+   npx wrangler secret put TOSS_LOGIN_DECRYPT_AAD
+   ```
+3. `server/src/env.ts`에 두 시크릿 타입 추가
+4. `server/src/lib/decrypt.ts` 생성 — AES-256-GCM 복호화 함수 (Web Crypto API 기반):
+   - 입력: base64 ciphertext, key (base64 디코드된 32바이트), AAD (string → bytes)
+   - 처리: ciphertext의 앞 12바이트 = IV, 뒤가 ciphertext+tag (마지막 16바이트가 GCM tag)
+   - 출력: 평문 string (UTF-8)
+5. [`server/src/routes/auth.ts`](../server/src/routes/auth.ts) `exchangeWithToss` 의 주석 처리된 부분 활성화 → `decrypt(meData.success?.name, env.TOSS_LOGIN_DECRYPT_KEY, env.TOSS_LOGIN_DECRYPT_AAD)` 호출 → 결과를 `name`으로 반환
+6. DB users.name 컬럼은 자동으로 평문 채워짐 (다음 신규 매핑부터)
+7. 기존 매핑 사용자는 [src/lib/notify-api.ts](../src/lib/notify-api.ts) 의 `ensureUserName()` 가 silent appLogin → backfill로 자동 복구
+
+> Toss SDK는 클라용 `tosscertEncrypt` 도 제공하지만 그건 본인확인(tosscert) 용이지 OAuth login-me PII 복호화와는 다른 기능. 반드시 서버에서 콘솔 발급 키로 풀어야 함.
 
 ---
 
@@ -301,6 +381,9 @@ npm run deploy                                       # 콘솔에 업로드 → d
 | 푸시 안 옴 | `TOSS_MODE = "mock"` | wrangler.toml에서 `real` 로 변경 + 재배포 |
 | 푸시 안 옴 | 같은 (사용자, 날짜, 타입) 이미 sent | `notifications` 테이블에 sent 기록 있음 — 중복 방지로 skip. 하루 1번만 발송 정상 |
 | `toss_oauth_failed` (이전 코드) | 응답 필드 `result` ↔ `success` 차이, login-me 단계 누락 | 현재 코드는 수정 완료. 옛 빌드면 재배포 |
+| 기존 유저 푸시 안 옴 (`toss_user_key` NULL) | OAuth 매핑 추가 *전*에 온보딩 완료 / `appLogin()` silent 실패 | §5.5 자동 복구 흐름이 다음 진입 시 OnboardingSheet(recovery 모드)로 띄워 재매핑 유도. 즉시 강제 복구하려면 `localStorage.removeItem("onboarded.v1"); localStorage.removeItem("mappingVerified.v1")` 후 앱 재진입 |
+| Recovery 온보딩이 무한히 다시 뜸 | 복구 useEffect의 deps가 `[showOnboarding]`이라 onDone 후 재실행되며 매핑이 아직 진행 중일 때 또 `isMapped:false` 응답 → reset 반복 | `recoveryCheckedRef` ref 가드가 한 세션 1회만 실행되도록 막음. 옛 빌드면 재배포 (deploymentId ≥ `019e0a33-ad0d-7b4c-bfc1-5493bcd148ea`) |
+| Recovery 모드에서 `appLogin()` UI 안 뜸 | 토스가 이미 동의한 사용자의 인가코드를 silent하게 발급 (정상 동작) | 매핑이 silent하게 완료된 것 — `users.toss_user_key`가 채워졌는지 D1 조회로 확인 |
 
 ---
 

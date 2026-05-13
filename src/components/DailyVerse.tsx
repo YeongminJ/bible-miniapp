@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { getSchemeUri } from "@apps-in-toss/web-framework";
 import { getAudioUrlFromRef } from "../utils/audioUrl";
 import { track } from "../lib/analytics";
-import { shareMessage } from "../lib/share";
+import { personalize, shareMessage } from "../lib/share";
 import { completeMission } from "../lib/missions";
 
 interface Prayer {
@@ -79,6 +79,7 @@ export default function DailyVerse() {
   const [loading, setLoading] = useState(false);
   const [voice, setVoice] = useState<"v1" | "v2">("v2");
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [autoPlayPending, setAutoPlayPending] = useState(false);
 
   const stopAudio = () => {
     if (audioRef.current) {
@@ -114,6 +115,32 @@ export default function DailyVerse() {
   };
 
   useEffect(() => () => stopAudio(), []);
+
+  // 미션 패널에서 "오늘의 말씀 듣기"를 탭하면 카드를 펼치고 자동 재생
+  useEffect(() => {
+    const onInvoke = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { id?: string } | null;
+      if (detail?.id !== "verse") return;
+      setExpanded(true);
+      setAutoPlayPending(true);
+      // 카드가 보이도록 부드럽게 스크롤
+      requestAnimationFrame(() => {
+        cardRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      });
+    };
+    window.addEventListener("mission:invoke", onInvoke);
+    return () => window.removeEventListener("mission:invoke", onInvoke);
+  }, []);
+
+  // verse가 로드되고 재생 가능 상태가 되면 자동 재생 발동
+  useEffect(() => {
+    if (!autoPlayPending) return;
+    if (!verse) return;
+    if (playing || loading) return;
+    setAutoPlayPending(false);
+    togglePlay();
+    // togglePlay는 동기로 audio.play()를 호출. completeMission("verse")도 내부에서 처리됨.
+  }, [autoPlayPending, verse, playing, loading]);
 
   // 카드 바깥(퀴즈/기도/인물 내부)의 버튼 등을 클릭하면 자동 접기
   useEffect(() => {
@@ -219,7 +246,11 @@ export default function DailyVerse() {
             <button
               style={styles.shareBtn}
               onClick={async () => {
-                const res = await shareMessage(`📖 오늘의 말씀 · ${verse.reference}\n\n${verse.text}`);
+                const heading = personalize({
+                  withName: (name) => `📖 ${name}님이 받은 오늘의 말씀 · ${verse.reference}`,
+                  fallback: `📖 오늘의 말씀 · ${verse.reference}`,
+                });
+                const res = await shareMessage(`${heading}\n\n${verse.text}`);
                 track.click("daily_verse_share", { reference: verse.reference, ok: res.ok });
               }}
             >

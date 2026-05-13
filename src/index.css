@@ -28,6 +28,25 @@ body {
   display: none;
 }
 
+@keyframes dh-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* 미션 invoke 시 퀴즈 '쉬움' 버튼에 적용되는 두근두근 애니메이션 */
+@keyframes qt-heartbeat {
+  0%, 100% { transform: scale(1); }
+  14% { transform: scale(1.04); }
+  28% { transform: scale(1); }
+  42% { transform: scale(1.05); }
+  70% { transform: scale(1); }
+}
+
+/* 통독 시작 버튼 — 사용자에게 탭을 유도하는 펄스 */
+@keyframes br-pulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(13, 148, 136, 0.5); }
+  50% { transform: scale(1.04); box-shadow: 0 0 0 10px rgba(13, 148, 136, 0); }
+}
+
 @media (min-width: 481px) {
   body {
     display: flex;

@@ -1,7 +1,26 @@
 import { share, getTossShareLink } from "@apps-in-toss/web-framework";
+import { getDisplayName } from "./user-name";
 
 // granite.config.ts 의 appName 과 일치시켜야 해요
 const APP_NAME = "bible-mini";
+
+/**
+ * 공유 메시지에 "{이름}님" prefix를 붙인다.
+ * 캐시된 표시 이름이 없으면 fallback 메시지 그대로 사용.
+ *
+ * @example
+ * personalize({
+ *   withName: (name) => `📖 ${name}님이 받은 오늘의 말씀`,
+ *   fallback: `📖 오늘의 말씀`,
+ * })
+ */
+export function personalize(opts: {
+  withName: (name: string) => string;
+  fallback: string;
+}): string {
+  const name = getDisplayName();
+  return name ? opts.withName(name) : opts.fallback;
+}
 
 /**
  * 토스 공유 링크를 만들고 네이티브 공유 시트를 띄워요.

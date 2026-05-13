@@ -12,6 +12,11 @@ import { ensureMapped, subscribeNotify } from "../lib/notify-api";
 
 interface Props {
   onDone: () => void;
+  /**
+   * 'fresh': 첫 진입(기본). 전체 기능 소개를 보여줌.
+   * 'recovery': 토스 OAuth 매핑이 깨진 기존 유저에게 다시 띄움. 안내 배너로 맥락 제공.
+   */
+  mode?: "fresh" | "recovery";
 }
 
 const FEATURES: { emoji: string; title: string; desc: string }[] = [
@@ -21,7 +26,8 @@ const FEATURES: { emoji: string; title: string; desc: string }[] = [
   { emoji: "🔔", title: "알림 리마인더", desc: "내가 정한 시각에 챙겨드려요." },
 ];
 
-export default function OnboardingSheet({ onDone }: Props) {
+export default function OnboardingSheet({ onDone, mode = "fresh" }: Props) {
+  const isRecovery = mode === "recovery";
   const initial = loadNotifySettings();
   // 첫 진입 시 알림 기본 ON. 사용자가 토글로 끌 수 있음.
   const [enabled, setEnabled] = useState<boolean>(true);
@@ -52,14 +58,15 @@ export default function OnboardingSheet({ onDone }: Props) {
       action,
       notify_enabled: finalEnabled,
       times: times.join(","),
+      mode,
     });
     if (finalEnabled && times.length > 0) {
-      // 워커가 단일 reminderMinute만 지원하므로 첫 번째(가장 이른) 시각만 등록
+      // 사용자가 고른 모든 시각을 등록 (서버가 user_reminders를 replace-all).
       // 토스 OAuth 매핑이 필요(푸시 라우팅 키 발급) — 매핑 후 구독.
       void ensureUserKey().then(async (userKey) => {
         if (!userKey) return;
         await ensureMapped(userKey); // 실패해도 구독은 진행 (서버 row 생성용)
-        await subscribeNotify(userKey, times[0]);
+        await subscribeNotify(userKey, times);
       });
     }
     onDone();
@@ -68,23 +75,41 @@ export default function OnboardingSheet({ onDone }: Props) {
   return (
     <div style={styles.overlay}>
       <div style={styles.card}>
-        <div style={styles.hero}>
-          <div style={styles.heroEmoji}>📖</div>
-          <h1 style={styles.title}>오늘의 말씀</h1>
-          <p style={styles.subtitle}>매일 한 절의 말씀과 기도, 짧은 묵상</p>
-        </div>
-
-        <div style={styles.featureList}>
-          {FEATURES.map((f) => (
-            <div key={f.title} style={styles.featureItem}>
-              <span style={styles.featureEmoji}>{f.emoji}</span>
-              <div style={{ flex: 1 }}>
-                <div style={styles.featureTitle}>{f.title}</div>
-                <div style={styles.featureDesc}>{f.desc}</div>
+        {isRecovery && (
+          <div style={styles.recoveryBanner} role="status">
+            <span style={styles.recoveryBannerEmoji}>🔔</span>
+            <div style={{ flex: 1 }}>
+              <div style={styles.recoveryBannerTitle}>알림 연결을 마무리해 주세요</div>
+              <div style={styles.recoveryBannerDesc}>
+                설정한 시각에 푸시가 도착하려면 토스 로그인 한 번만 더 진행해 주세요.
               </div>
             </div>
-          ))}
+          </div>
+        )}
+
+        <div style={styles.hero}>
+          <div style={styles.heroEmoji}>📖</div>
+          <h1 style={styles.title}>{isRecovery ? "다시 만나서 반가워요" : "오늘의 말씀"}</h1>
+          <p style={styles.subtitle}>
+            {isRecovery
+              ? "알림을 켜면 매일 같은 시각에 챙겨드릴게요."
+              : "매일 한 절의 말씀과 기도, 짧은 묵상"}
+          </p>
         </div>
+
+        {!isRecovery && (
+          <div style={styles.featureList}>
+            {FEATURES.map((f) => (
+              <div key={f.title} style={styles.featureItem}>
+                <span style={styles.featureEmoji}>{f.emoji}</span>
+                <div style={{ flex: 1 }}>
+                  <div style={styles.featureTitle}>{f.title}</div>
+                  <div style={styles.featureDesc}>{f.desc}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         <button
           style={{ ...styles.toggleRow, ...(enabled ? styles.toggleRowOn : {}) }}
@@ -131,10 +156,10 @@ export default function OnboardingSheet({ onDone }: Props) {
 
         <div style={styles.actions}>
           <button style={styles.skipBtn} onClick={() => finish("skip")}>
-            지금은 건너뛰기
+            {isRecovery ? "알림 끄기" : "지금은 건너뛰기"}
           </button>
           <button style={styles.startBtn} onClick={() => finish("start")}>
-            시작하기
+            {isRecovery ? "알림 다시 연결하기" : "시작하기"}
           </button>
         </div>
       </div>
@@ -250,5 +275,19 @@ const styles: Record<string, React.CSSProperties> = {
     flex: 1, padding: "14px", borderRadius: "12px",
     backgroundColor: "#0D9488", color: "#FFFFFF",
     fontSize: "15px", fontWeight: 800, border: "none", cursor: "pointer",
+  },
+  recoveryBanner: {
+    display: "flex", alignItems: "flex-start", gap: "10px",
+    padding: "12px 14px",
+    borderRadius: "14px",
+    backgroundColor: "#FFFBEB",
+    border: "1px solid #FDE68A",
+  },
+  recoveryBannerEmoji: { fontSize: "20px", lineHeight: 1.2 },
+  recoveryBannerTitle: {
+    fontSize: "14px", fontWeight: 800, color: "#92400E", marginBottom: "2px",
+  },
+  recoveryBannerDesc: {
+    fontSize: "12px", color: "#92400E", lineHeight: 1.5, opacity: 0.85,
   },
 };

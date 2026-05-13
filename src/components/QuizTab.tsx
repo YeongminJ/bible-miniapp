@@ -2,8 +2,9 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import VerseAudio from "./VerseAudio";
 import { showInterstitialAd } from "../lib/ad";
 import { track } from "../lib/analytics";
-import { shareMessage } from "../lib/share";
+import { personalize, shareMessage } from "../lib/share";
 import { completeMission } from "../lib/missions";
+import { pickFreshQuizzes, fisherYatesShuffle, markSeen } from "../lib/quiz-seen";
 
 const MAX_LIVES = 2;
 const QUESTIONS_PER_ROUND = 5;
@@ -40,6 +41,8 @@ export default function QuizTab() {
   const [timer, setTimer] = useState(10);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [showConfetti, setShowConfetti] = useState(false);
+  const [highlightLevel, setHighlightLevel] = useState<Difficulty | null>(null);
+  const highlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const stopTimer = useCallback(() => {
     if (timerRef.current) {
@@ -82,15 +85,47 @@ export default function QuizTab() {
       .then(setAllQuizzes);
   }, []);
 
+  // 미션 패널에서 "초급 퀴즈" 미션을 탭하면 쉬움 버튼에 두근두근 강조
+  useEffect(() => {
+    const onInvoke = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { id?: string } | null;
+      if (detail?.id !== "quiz") return;
+      // 진행 중인 라운드를 강제 종료하지 않음 (사용자 진행도 보호)
+      // 단지 쉬움 버튼에 잠시 두근두근 표시 — 난이도 선택 화면일 때만 보임
+      setHighlightLevel("쉬움");
+      if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
+      highlightTimerRef.current = setTimeout(() => setHighlightLevel(null), 6000);
+    };
+    window.addEventListener("mission:invoke", onInvoke);
+    return () => {
+      window.removeEventListener("mission:invoke", onInvoke);
+      if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
+    };
+  }, []);
+
+  // 쉬움 라운드 완주 = quiz 미션 완료 (이전 '1문제 정답' 기준 폐지)
+  useEffect(() => {
+    if (finished && difficulty === "쉬움") {
+      completeMission("quiz");
+    }
+  }, [finished, difficulty]);
+
   const startQuiz = (diff: Difficulty) => {
     track.click("quiz_start", { difficulty: diff });
     setDifficulty(diff);
     const pool = (diff === "전체" || diff === "무한")
       ? allQuizzes
       : allQuizzes.filter((q) => q.difficulty === diff);
-    const seed = Date.now();
-    const shuffled = [...pool].sort(() => Math.sin(seed + Math.random()) - 0.5);
-    setDailyQuizzes(diff === "무한" ? shuffled : shuffled.slice(0, QUESTIONS_PER_ROUND));
+    let picked: Quiz[];
+    if (diff === "무한") {
+      // 무한 모드 — 전체 풀을 한 번에 균일 셔플 (seen 기록 X, 어차피 한 라운드에 한 번씩)
+      picked = fisherYatesShuffle(pool);
+    } else {
+      // 라운드 모드 — seen에 없는 문제를 우선 픽. 부족하면 자동 리셋.
+      picked = pickFreshQuizzes(pool, diff, QUESTIONS_PER_ROUND);
+      markSeen(diff, picked.map((q) => q.id));
+    }
+    setDailyQuizzes(picked);
     setCurrentIndex(0);
     setSelected(null);
     setScore(0);
@@ -113,33 +148,41 @@ export default function QuizTab() {
           <div style={styles.levelTitle}>성경 퀴즈</div>
           <div style={styles.levelSubtitle}>난이도를 선택하세요</div>
           <div style={styles.levelButtons}>
-            {(["쉬움", "보통", "어려움", "전체", "무한"] as Difficulty[]).map((diff) => (
-              <button
-                key={diff}
-                style={{
-                  ...styles.levelButton,
-                  ...(diff === "쉬움" ? { backgroundColor: "#DCFCE7", color: "#166534" } :
-                    diff === "보통" ? { backgroundColor: "#FEF3C7", color: "#92400E" } :
-                    diff === "어려움" ? { backgroundColor: "#FEE2E2", color: "#991B1B" } :
-                    diff === "무한" ? { backgroundColor: "#EDE9FE", color: "#5B21B6" } :
-                    { backgroundColor: "#F0FDFA", color: "#0D9488" }),
-                }}
-                onClick={() => startQuiz(diff)}
-              >
-                <span style={styles.levelEmoji}>
-                  {diff === "쉬움" ? "🌱" : diff === "보통" ? "🌿" : diff === "어려움" ? "🌳" : diff === "무한" ? "♾️" : "🎯"}
-                </span>
-                <span style={styles.levelLabel}>
-                  {diff}
-                  {diff === "무한" && <span style={styles.levelTag}> 목숨 다할 때까지</span>}
-                </span>
-                <span style={styles.levelCount}>
-                  {diff === "전체" || diff === "무한"
-                    ? `${allQuizzes.length}문제`
-                    : `${allQuizzes.filter((q) => q.difficulty === diff).length}문제`}
-                </span>
-              </button>
-            ))}
+            {(["쉬움", "보통", "어려움", "전체", "무한"] as Difficulty[]).map((diff) => {
+              const isHighlighted = highlightLevel === diff;
+              return (
+                <button
+                  key={diff}
+                  style={{
+                    ...styles.levelButton,
+                    ...(diff === "쉬움" ? { backgroundColor: "#DCFCE7", color: "#166534" } :
+                      diff === "보통" ? { backgroundColor: "#FEF3C7", color: "#92400E" } :
+                      diff === "어려움" ? { backgroundColor: "#FEE2E2", color: "#991B1B" } :
+                      diff === "무한" ? { backgroundColor: "#EDE9FE", color: "#5B21B6" } :
+                      { backgroundColor: "#F0FDFA", color: "#0D9488" }),
+                    ...(isHighlighted ? styles.levelButtonHighlighted : {}),
+                  }}
+                  onClick={() => {
+                    setHighlightLevel(null);
+                    startQuiz(diff);
+                  }}
+                >
+                  <span style={styles.levelEmoji}>
+                    {diff === "쉬움" ? "🌱" : diff === "보통" ? "🌿" : diff === "어려움" ? "🌳" : diff === "무한" ? "♾️" : "🎯"}
+                  </span>
+                  <span style={styles.levelLabel}>
+                    {diff}
+                    {diff === "무한" && <span style={styles.levelTag}> 목숨 다할 때까지</span>}
+                    {isHighlighted && <span style={styles.levelMissionTag}>💓 미션</span>}
+                  </span>
+                  <span style={styles.levelCount}>
+                    {diff === "전체" || diff === "무한"
+                      ? `${allQuizzes.length}문제`
+                      : `${allQuizzes.filter((q) => q.difficulty === diff).length}문제`}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -206,9 +249,12 @@ export default function QuizTab() {
               style={styles.shareResultButton}
               onClick={async () => {
                 const modeLabel = isInfinite ? "무한 모드" : `${difficulty} 난이도`;
-                const msg = isInfinite
-                  ? `📖 성경 퀴즈 ${modeLabel}\n${score}/${answered} 정답 · ${totalPoints}점!\n\n나도 도전해보기 👉`
-                  : `📖 성경 퀴즈 ${modeLabel}\n${score}/${QUESTIONS_PER_ROUND} 정답 · ${totalPoints}점!\n\n나도 도전해보기 👉`;
+                const denom = isInfinite ? answered : QUESTIONS_PER_ROUND;
+                const heading = personalize({
+                  withName: (name) => `📖 ${name}님의 성경 퀴즈 ${modeLabel}`,
+                  fallback: `📖 성경 퀴즈 ${modeLabel}`,
+                });
+                const msg = `${heading}\n${score}/${denom} 정답 · ${totalPoints}점!\n\n나도 도전해보기 👉`;
                 const res = await shareMessage(msg);
                 track.click("quiz_share_result", {
                   difficulty: difficulty ?? "unknown",
@@ -412,7 +458,7 @@ export default function QuizTab() {
                 setSelected(i);
                 const correct = i === quiz.answer;
                 if (correct) {
-                  completeMission("quiz");
+                  // 미션 완료는 '쉬움 라운드 완주'로 변경 (위 useEffect에서 처리)
                   const newStreak = streak + 1;
                   setStreak(newStreak);
                   setScore((s) => s + 1);
@@ -568,10 +614,23 @@ const styles: Record<string, React.CSSProperties> = {
     display: "flex", alignItems: "center", gap: "12px",
     padding: "18px 20px", borderRadius: "16px", border: "none",
     cursor: "pointer", fontSize: "16px", fontWeight: 700, textAlign: "left" as const,
+    position: "relative" as const,
+  },
+  levelButtonHighlighted: {
+    animation: "qt-heartbeat 1.1s ease-in-out infinite",
+    boxShadow: "0 0 0 3px rgba(13, 148, 136, 0.35)",
+    outline: "2px solid #0D9488",
+    outlineOffset: "2px",
   },
   levelEmoji: { fontSize: "24px" },
   levelLabel: { flex: 1 },
   levelTag: { fontSize: "11px", fontWeight: 700, opacity: 0.7, marginLeft: "6px" },
+  levelMissionTag: {
+    fontSize: "11px", fontWeight: 800, marginLeft: "8px",
+    color: "#0D9488", backgroundColor: "rgba(255,255,255,0.85)",
+    padding: "2px 8px", borderRadius: "100px",
+    border: "1px solid #0D9488",
+  },
   levelCount: { fontSize: "13px", opacity: 0.7 },
   infiniteBar: {
     display: "flex", justifyContent: "space-between", alignItems: "center",

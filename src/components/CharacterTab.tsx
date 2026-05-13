@@ -2,7 +2,8 @@ import { useState, useEffect, useMemo } from "react";
 import VerseAudio from "./VerseAudio";
 import { track } from "../lib/analytics";
 import { showInterstitialAd } from "../lib/ad";
-import { shareMessage } from "../lib/share";
+import { personalize, shareMessage } from "../lib/share";
+import { completeMission } from "../lib/missions";
 
 // 닮은 인물 이력 저장 키
 const MATCH_HISTORY_KEY = "characterMatchHistory.v1";
@@ -221,6 +222,7 @@ export default function CharacterTab() {
     setMatchedChar(best);
     setQuizPhase("result");
     if (best) {
+      completeMission("character");
       track.impression("character_quiz_result", {
         character_id: best.id,
         name: best.name,
@@ -239,7 +241,11 @@ export default function CharacterTab() {
   }
 
   async function shareMatchResult(char: Character) {
-    const message = `나와 가장 닮은 성경 인물은 "${char.name} (${char.title})" 입니다!\n\n${char.summary}\n\n나도 테스트 하러 가기 👉`;
+    const heading = personalize({
+      withName: (name) => `${name}님과 가장 닮은 성경 인물은 "${char.name} (${char.title})" 입니다!`,
+      fallback: `나와 가장 닮은 성경 인물은 "${char.name} (${char.title})" 입니다!`,
+    });
+    const message = `${heading}\n\n${char.summary}\n\n나도 테스트 하러 가기 👉`;
     const res = await shareMessage(message);
     track.click("character_match_share", { character_id: char.id, name: char.name, ok: res.ok });
     if (!res.ok) {

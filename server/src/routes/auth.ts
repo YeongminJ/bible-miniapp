@@ -5,6 +5,7 @@ import { z } from "zod";
 import { getDb } from "../db/client";
 import { users } from "../db/schema";
 import type { Env } from "../env";
+import { decryptTossPII } from "../lib/decrypt";
 
 const TOKEN_URL =
   "https://apps-in-toss-api.toss.im/api-partner/v1/apps-in-toss/user/oauth2/generate-token";
@@ -45,6 +46,8 @@ interface TossLoginMeResponse {
     userKey?: number | string;
     scope?: string;
     agreedTerms?: string[];
+    /** user_name scope 동의 시 포함. 미동의면 undefined. */
+    name?: string;
   };
   error?: { errorCode?: string; reason?: string } | string;
 }
@@ -61,7 +64,11 @@ async function exchangeWithToss(
   cert: Fetcher,
   authorizationCode: string,
   referrer: string,
-): Promise<{ userKey: string } | { error: string; status: number }> {
+  decryptKey: string | undefined,
+  decryptAad: string | undefined,
+): Promise<
+  { userKey: string; name?: string } | { error: string; status: number }
+> {
   // ── 1) generate-token ───────────────────────────────────────────
   let tokenRes: Response;
   try {
@@ -130,7 +137,19 @@ async function exchangeWithToss(
     );
     return { error: "toss_login_me_failed", status: 502 };
   }
-  return { userKey: String(userKey) };
+  // login-me 의 `success.name` 은 AES-256-GCM 암호문(base64). 키 + AAD 가 있을 때만 복호화.
+  let plainName: string | undefined;
+  const encryptedName = meData.success?.name;
+  if (encryptedName && decryptKey && decryptAad) {
+    const decrypted = await decryptTossPII(encryptedName, decryptKey, decryptAad);
+    if (decrypted && decrypted.length > 0) {
+      plainName = decrypted;
+    }
+  }
+  return {
+    userKey: String(userKey),
+    name: plainName,
+  };
 }
 
 const route = new Hono<{ Bindings: Env }>();
@@ -148,6 +167,8 @@ route.post("/exchange", zValidator("json", exchangeSchema), async (c) => {
     c.env.TOSS_CERT,
     body.authorizationCode,
     body.referrer,
+    c.env.TOSS_LOGIN_DECRYPT_KEY,
+    c.env.TOSS_LOGIN_DECRYPT_AAD,
   );
   if ("error" in result) {
     console.warn("[auth/exchange] failed", result.error);
@@ -193,6 +214,8 @@ route.post(
       c.env.TOSS_CERT,
       authorizationCode,
       referrer,
+      c.env.TOSS_LOGIN_DECRYPT_KEY,
+      c.env.TOSS_LOGIN_DECRYPT_AAD,
     );
     if ("error" in result) {
       console.warn("[auth/migration/link] toss oauth failed", result.error);
@@ -201,11 +224,24 @@ route.post(
 
     const db = getDb(c.env.DB);
     const now = Date.now();
+    // upsert: 신규 row면 모든 필드, 기존 row면 토스 매핑 + name만 갱신.
+    // name은 user_name scope 동의 안 했을 수도 있으므로 undefined일 수 있음 — 그땐 기존 값 유지.
+    const updateSet: {
+      tossUserKey: string;
+      updatedAt: number;
+      name?: string;
+    } = {
+      tossUserKey: result.userKey,
+      updatedAt: now,
+    };
+    if (result.name) updateSet.name = result.name;
+
     await db
       .insert(users)
       .values({
         userKey: hash,
         tossUserKey: result.userKey,
+        name: result.name ?? null,
         reminderMinute: null,
         dailyEnabled: true,
         streakWarnEnabled: true,
@@ -215,10 +251,10 @@ route.post(
       })
       .onConflictDoUpdate({
         target: users.userKey,
-        set: { tossUserKey: result.userKey, updatedAt: now },
+        set: updateSet,
       });
 
-    return c.json({ success: true });
+    return c.json({ success: true, name: result.name ?? null });
   },
 );
 

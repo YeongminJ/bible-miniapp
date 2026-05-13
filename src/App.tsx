@@ -1,25 +1,32 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { SafeAreaInsets, getSchemeUri } from "@apps-in-toss/web-framework";
 import QuizTab from "./components/QuizTab";
 import PrayerTab from "./components/PrayerTab";
 import CharacterTab from "./components/CharacterTab";
+import BibleReadingTab from "./components/BibleReadingTab";
 import DailyVerse from "./components/DailyVerse";
 import DailyHeader from "./components/DailyHeader";
 import OnboardingSheet from "./components/OnboardingSheet";
-import { hasOnboarded } from "./lib/onboarding";
+import { hasOnboarded, resetOnboarded } from "./lib/onboarding";
 import { UserProvider, useUser } from "./lib/UserContext";
 import { track } from "./lib/analytics";
+import { isMappingVerified } from "./lib/mapping-cache";
+import { checkMappingStatus, ensureUserName } from "./lib/notify-api";
+import { loadNotifySettings } from "./lib/notify-settings";
+import { ensureUserKey } from "./lib/user-key";
 
-type Tab = "quiz" | "prayer" | "character";
+type Tab = "quiz" | "prayer" | "character" | "bible";
 
 const TABS: { key: Tab; label: string; icon: string }[] = [
-  { key: "quiz", label: "퀴즈", icon: "📖" },
+  { key: "quiz", label: "퀴즈", icon: "🎯" },
   { key: "prayer", label: "기도", icon: "🙏" },
   { key: "character", label: "인물", icon: "👤" },
+  { key: "bible", label: "통독", icon: "📖" },
 ];
 
 const LAST_TAB_KEY = "lastActiveTab.v1";
-const isTab = (v: unknown): v is Tab => v === "quiz" || v === "prayer" || v === "character";
+const isTab = (v: unknown): v is Tab =>
+  v === "quiz" || v === "prayer" || v === "character" || v === "bible";
 
 // 앱인토스 콘솔의 "앱 내 기능" 진입 스킴 또는 브라우저 URL을 해석해 초기 탭 결정
 // 지원 형식:
@@ -47,11 +54,15 @@ function getInitialTabFromScheme(): Tab | null {
   if (/\/(quiz|q)(?=$|[/?#])/i.test(lower)) return "quiz";
   if (/\/(prayer|p)(?=$|[/?#])/i.test(lower)) return "prayer";
   if (/\/(character|c|people|person)(?=$|[/?#])/i.test(lower)) return "character";
+  if (/\/(bible|b|read|reading)(?=$|[/?#])/i.test(lower)) return "bible";
   return null;
 }
 
 function AppContent() {
   const [showOnboarding, setShowOnboarding] = useState<boolean>(() => !hasOnboarded());
+  const [onboardingMode, setOnboardingMode] = useState<"fresh" | "recovery">(() =>
+    hasOnboarded() ? "recovery" : "fresh",
+  );
   const [activeTab, setActiveTab] = useState<Tab>(() => {
     const fromScheme = getInitialTabFromScheme();
     if (fromScheme) return fromScheme;
@@ -78,10 +89,74 @@ function AppContent() {
     track.screen("app_open");
   }, []);
 
+  // 표시 이름 동기화 (공유 메시지에 "{이름}님" prefix 용도).
+  // 매핑된 사용자만 의미 있고, 캐시 히트면 네트워크 호출 없이 즉시 반환.
+  useEffect(() => {
+    void (async () => {
+      const hash = await ensureUserKey();
+      if (!hash) return;
+      await ensureUserName(hash);
+    })();
+  }, []);
+
   useEffect(() => {
     track.screen(`tab_${activeTab}`, { tab: activeTab });
     try { localStorage.setItem(LAST_TAB_KEY, activeTab); } catch { /* ignore */ }
   }, [activeTab]);
+
+  // 미션 액션: 각 미션 id에 따라 적절한 탭으로 이동.
+  //  - verse: 탭 변경 불필요 (헤더 위 카드, DailyVerse가 자체 listen해서 expand+TTS)
+  //  - quiz: 퀴즈 탭으로 이동, QuizTab이 listen해서 '쉬움' 버튼 두근두근
+  //  - prayer: 기도 탭
+  //  - gratitude: 기도 탭(감사일기 섹션이 거기 있음), GratitudeJournal이 listen해서 작성 모달 열기
+  //  - character: 인물 탭
+  useEffect(() => {
+    const onInvoke = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { id?: string } | null;
+      const id = detail?.id;
+      if (id === "quiz") setActiveTab("quiz");
+      else if (id === "prayer" || id === "gratitude") setActiveTab("prayer");
+      else if (id === "character") setActiveTab("character");
+    };
+    window.addEventListener("mission:invoke", onInvoke);
+    return () => window.removeEventListener("mission:invoke", onInvoke);
+  }, []);
+
+  // OAuth 매핑 깨진 케이스 자동 복구.
+  //  - 정상 유저(이전에 isMapped 확인된 적 있음)는 localStorage 플래그로 즉시 skip → 네트워크 호출 0
+  //  - 플래그 없고, 알림 ON 상태이며, 서버가 명확히 "미매핑" 응답을 주면 onboarded 플래그 리셋
+  //    → OnboardingSheet 다시 띄움(recovery 모드) → 사용자가 "시작하기" 누르면 ensureMapped 재시도
+  //
+  // 중요: 한 세션에 한 번만 체크한다(ref 가드).
+  // 이게 없으면 사용자가 recovery onboarding을 끝낸 직후 useEffect가 재실행되어
+  // 아직 ensureMapped(appLogin)이 진행 중인 동안 verified 플래그가 없다는 이유로
+  // 다시 onboarded를 reset → 온보딩이 또 뜨는 무한 루프 발생.
+  const recoveryCheckedRef = useRef(false);
+  useEffect(() => {
+    if (recoveryCheckedRef.current) return;
+    if (showOnboarding) return; // 이미 온보딩 중(첫 진입 fresh 모드 등)
+    if (!hasOnboarded()) return;
+    if (isMappingVerified()) return;
+    recoveryCheckedRef.current = true; // 중복 트리거 방지
+    let cancelled = false;
+    void (async () => {
+      const notify = loadNotifySettings();
+      if (!notify.enabled) return; // 알림 끈 상태면 복구 불필요
+      const hash = await ensureUserKey();
+      if (!hash || cancelled) return;
+      const { isMapped, ok } = await checkMappingStatus(hash);
+      if (cancelled) return;
+      if (ok && !isMapped) {
+        track.screen("onboarding_recovery_trigger", { reason: "missing_toss_mapping" });
+        resetOnboarded();
+        setOnboardingMode("recovery");
+        setShowOnboarding(true);
+      }
+      // ok && isMapped인 경우 checkMappingStatus 내부에서 markMappingVerified 호출됨
+      // ok=false는 네트워크/서버 오류이므로 절대 reset하지 않음
+    })();
+    return () => { cancelled = true; };
+  }, [showOnboarding]);
 
   const topPad = Math.max(insets.top, 0);
   const bottomPad = Math.max(insets.bottom, 12);
@@ -98,7 +173,15 @@ function AppContent() {
   }
 
   if (showOnboarding) {
-    return <OnboardingSheet onDone={() => setShowOnboarding(false)} />;
+    return (
+      <OnboardingSheet
+        mode={onboardingMode}
+        onDone={() => {
+          setShowOnboarding(false);
+          setOnboardingMode("fresh");
+        }}
+      />
+    );
   }
 
   return (
@@ -115,6 +198,7 @@ function AppContent() {
         {activeTab === "quiz" && <QuizTab />}
         {activeTab === "prayer" && <PrayerTab />}
         {activeTab === "character" && <CharacterTab />}
+        {activeTab === "bible" && <BibleReadingTab />}
       </div>
 
       {/* 하단 탭바 */}

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import VerseAudio from "./VerseAudio";
-import { shareMessage } from "../lib/share";
+import { personalize, shareMessage } from "../lib/share";
 import { track } from "../lib/analytics";
 
 interface ReadAlongModeProps {
@@ -48,8 +48,12 @@ export default function ReadAlongMode({ title, content, onClose, reference, vers
             <button
               style={styles.doneShareButton}
               onClick={async () => {
+                const heading = personalize({
+                  withName: (name) => `🙏 ${name}님이 기도를 마쳤습니다`,
+                  fallback: `🙏 기도를 마쳤습니다`,
+                });
                 const parts = [
-                  `🙏 기도를 마쳤습니다`,
+                  heading,
                   `"${title}"`,
                   content,
                 ];

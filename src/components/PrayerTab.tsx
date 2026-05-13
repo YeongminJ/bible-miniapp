@@ -2,11 +2,12 @@ import { useState, useEffect, useMemo } from "react";
 import VerseAudio from "./VerseAudio";
 import ReadAlongMode from "./ReadAlongMode";
 import ProfileSelector from "./ProfileSelector";
+import GratitudeJournal from "./GratitudeJournal";
 import { loadProfile, matchScore, type UserProfile } from "../lib/profile";
 import { useUser } from "../lib/UserContext";
 import { saveUserData } from "../lib/userStore";
 import { track } from "../lib/analytics";
-import { shareMessage } from "../lib/share";
+import { personalize, shareMessage } from "../lib/share";
 import { completeMission } from "../lib/missions";
 
 interface Prayer {
@@ -180,6 +181,9 @@ export default function PrayerTab() {
         </button>
       )}
 
+      {/* 감사일기 */}
+      <GratitudeJournal />
+
       {/* 카테고리 칩 */}
       <div style={styles.chips}>
         {CATEGORIES.map((cat) => {
@@ -303,7 +307,11 @@ export default function PrayerTab() {
                   <button
                     style={styles.shareButton}
                     onClick={async () => {
-                      const msg = `🙏 오늘의 기도 · ${prayer.category}\n\n${prayer.title}\n\n${prayer.content}\n\n📖 ${prayer.relatedVerse}\n${prayer.relatedVerseText}`;
+                      const heading = personalize({
+                        withName: (name) => `🙏 ${name}님의 오늘의 기도 · ${prayer.category}`,
+                        fallback: `🙏 오늘의 기도 · ${prayer.category}`,
+                      });
+                      const msg = `${heading}\n\n${prayer.title}\n\n${prayer.content}\n\n📖 ${prayer.relatedVerse}\n${prayer.relatedVerseText}`;
                       const res = await shareMessage(msg);
                       track.click("prayer_share", {
                         prayer_id: prayer.id,
@@ -379,13 +387,15 @@ const styles: Record<string, React.CSSProperties> = {
   list: { display: "flex", flexDirection: "column", gap: "12px" },
   card: {
     backgroundColor: "#FFFFFF", borderRadius: "16px",
-    overflow: "hidden",
+    // overflow: hidden 제거 — 내부 버튼 포커스 outline이 라운드 모서리에 잘리는 문제 방지.
+    // cardBody/cardHeader 모두 패딩 안에 들어있어 시각적 overflow 부작용 없음.
     transition: "box-shadow 0.3s",
   },
   cardHeader: {
     display: "flex", justifyContent: "space-between", alignItems: "center",
     padding: "16px 20px", width: "100%", border: "none",
     backgroundColor: "transparent", cursor: "pointer", textAlign: "left" as const,
+    borderRadius: "16px", // 부모 라운드와 일치 → 포커스 outline이 둥근 모서리를 따라가도록
   },
   categoryRow: {
     display: "flex", alignItems: "center", gap: "8px",
