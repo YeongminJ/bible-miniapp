@@ -29,10 +29,12 @@ export interface PointsState {
   balance: number;
   /** 지금까지 수령에 성공한 총 포인트. 수령 시마다 누적. */
   claimedTotal: number;
-  /** 마지막으로 적립한 KST 날짜 (YYYY-MM-DD). 같은 날 중복 적립 방지. */
+  /** 마지막으로 (미션 채널에서) 적립한 KST 날짜 (YYYY-MM-DD). 같은 날 중복 적립 방지. */
   lastEarnedDate: string | null;
-  /** 마지막 적립 금액 (오늘 받은 금액 표시용). */
+  /** 마지막 미션 채널 적립 금액 (오늘 받은 금액 표시용). */
   lastEarnedAmount?: number;
+  /** 마지막으로 통독 광고 채널에서 적립한 KST 날짜. 미션과 별개로 하루 1회. */
+  lastBibleReadEarnedDate?: string | null;
 }
 
 function todayKey(): string {
@@ -63,6 +65,10 @@ function load(): PointsState {
         typeof parsed.lastEarnedAmount === "number"
           ? parsed.lastEarnedAmount
           : undefined,
+      lastBibleReadEarnedDate:
+        typeof parsed.lastBibleReadEarnedDate === "string"
+          ? parsed.lastBibleReadEarnedDate
+          : null,
     };
   } catch {
     return fresh();
@@ -140,6 +146,37 @@ export function isEarnedToday(s: PointsState = load()): boolean {
   const day = String(d.getDate()).padStart(2, "0");
   const today = `${d.getFullYear()}-${m}-${day}`;
   return s.lastEarnedDate === today;
+}
+
+/** 통독 광고 시청 보상 — 1원 고정. 미션 채널과 독립적이며 하루 1회. */
+export const BIBLE_READ_REWARD = 1;
+
+/**
+ * 통독 광고 시청 보상 — 별도 채널. 미션 적립과 독립.
+ * 같은 날 이미 받았으면 noop.
+ */
+export function earnFromBibleReadingAd(): {
+  earned: boolean;
+  state: PointsState;
+} {
+  const s = load();
+  const today = todayKey();
+  if (s.lastBibleReadEarnedDate === today) {
+    return { earned: false, state: s };
+  }
+  const next: PointsState = {
+    ...s,
+    balance: s.balance + BIBLE_READ_REWARD,
+    lastBibleReadEarnedDate: today,
+  };
+  save(next);
+  emitChanged();
+  return { earned: true, state: next };
+}
+
+/** 오늘 통독 광고 보상을 받았는지. */
+export function isBibleReadEarnedToday(s: PointsState = load()): boolean {
+  return s.lastBibleReadEarnedDate === todayKey();
 }
 
 /**

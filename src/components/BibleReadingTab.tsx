@@ -20,7 +20,8 @@ import {
   type BookProgress,
   type ReadingState,
 } from "../lib/bible-reading";
-import { showInterstitialAd } from "../lib/ad";
+import { showInterstitialAd, REWARD_AD_GROUP_ID } from "../lib/ad";
+import { earnFromBibleReadingAd, isBibleReadEarnedToday } from "../lib/points";
 import { track } from "../lib/analytics";
 import { personalize, shareMessage } from "../lib/share";
 import { getAudioUrl } from "../utils/audioUrl";
@@ -265,17 +266,34 @@ export default function BibleReadingTab() {
 
     if (!hasAdShownToday()) {
       setMode("ad");
+      let adShown = false;
       try {
-        const adResult = await showInterstitialAd();
+        // 리워드형 광고 키가 있으면 그걸 사용, 없으면 기본 전면광고로 fallback
+        const adResult = await showInterstitialAd(
+          REWARD_AD_GROUP_ID ? { adGroupId: REWARD_AD_GROUP_ID } : undefined,
+        );
+        adShown = adResult.shown;
         track.impression("bible_reading_ad_result", {
           shown: adResult.shown,
           reason: adResult.shown ? "dismissed" : adResult.reason,
+          ad_type: REWARD_AD_GROUP_ID ? "rewarded" : "interstitial",
         });
       } catch {
         /* ignore */
       }
-      markAdShownToday();
-      setAdShownToday(true);
+      // 광고가 실제로 노출된 경우에만 오늘 광고 락. 실패 시 다음 시도에 다시 시도 가능.
+      if (adShown) {
+        markAdShownToday();
+        setAdShownToday(true);
+        // 광고를 끝까지 본 경우에만 1원 적립. 같은 날 이미 받았으면 noop.
+        if (!isBibleReadEarnedToday()) {
+          const { earned } = earnFromBibleReadingAd();
+          if (earned) {
+            showFeedback("🎁 통독 광고 시청 보상 1원이 적립되었어요");
+            track.click("bible_reading_ad_reward_earned", { amount: 1 });
+          }
+        }
+      }
     }
     await beginPlayback(resumeTarget.bookId, resumeTarget.chapter, resumeTarget.verse);
   };
@@ -403,6 +421,7 @@ export default function BibleReadingTab() {
   }
 
   if (mode === "ad") {
+    const alreadyEarned = isBibleReadEarnedToday();
     return (
       <div style={styles.container}>
         <div style={styles.loadingBox}>
@@ -410,6 +429,11 @@ export default function BibleReadingTab() {
           <div style={{ fontSize: 14, color: "#374151", fontWeight: 700 }}>
             광고 준비 중…
           </div>
+          {!alreadyEarned && (
+            <div style={{ marginTop: 8, fontSize: 12, color: "#0D9488", fontWeight: 700 }}>
+              🎁 광고를 끝까지 보면 1원이 적립돼요
+            </div>
+          )}
         </div>
       </div>
     );
@@ -554,8 +578,8 @@ function ListView({
                   ? "통독 이어듣기"
                   : "통독 시작"
                 : resumeTarget
-                  ? "광고 보고 통독 이어듣기"
-                  : "광고 보고 통독 시작"}
+                  ? "광고 보고 이어듣기 (+1원 적립)"
+                  : "광고 보고 시작하기 (+1원 적립)"}
           </div>
           {!allDone && resumeBookName && resumeTarget && (
             <div style={styles.startBtnSub}>

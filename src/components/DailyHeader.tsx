@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { tickStreak, type StreakState } from "../lib/streak";
+import { tickStreak, reachedMilestone, type StreakState } from "../lib/streak";
 import {
   MISSION_POOL,
   getMissionDef,
@@ -31,7 +31,6 @@ import {
 import { showInterstitialAd } from "../lib/ad";
 import NotifySettingsModal from "./NotifySettingsModal";
 
-const AUTO_SHOW_MS = 4000;
 const TOTAL = 3;
 
 export default function DailyHeader() {
@@ -40,20 +39,59 @@ export default function DailyHeader() {
   const [notify, setNotify] = useState<NotifySettings>(() => loadNotifySettings());
   const [points, setPoints] = useState<PointsState>(() => getPointsState());
   const [open, setOpen] = useState(false);
+  // 미션 버튼 두근두근 효과 — 진입 시 미완료 미션이 있으면 활성. 사용자가 처음 탭하면 꺼짐.
+  const [pulseMission, setPulseMission] = useState(false);
   const [notifyOpen, setNotifyOpen] = useState(false);
   const [claiming, setClaiming] = useState(false);
   const [claimPhase, setClaimPhase] = useState<"ad" | "grant" | null>(null);
   const [earning, setEarning] = useState(false);
   const [feedback, setFeedback] = useState<{ type: "ok" | "err"; text: string } | null>(null);
   const wrapRef = useRef<HTMLDivElement | null>(null);
+  // 디버그용 — 🔥 스트릭 칩 빠르게 7번 탭하면 localStorage 초기화. 1.5s 안에 7번 안 누르면 카운트 리셋.
+  const debugTapCountRef = useRef(0);
+  const debugTapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleStreakChipTap = () => {
+    debugTapCountRef.current += 1;
+    if (debugTapTimerRef.current) clearTimeout(debugTapTimerRef.current);
+    debugTapTimerRef.current = setTimeout(() => { debugTapCountRef.current = 0; }, 1500);
+    if (debugTapCountRef.current >= 7) {
+      debugTapCountRef.current = 0;
+      if (window.confirm("앱 데이터를 초기화할까요? (디버그용)")) {
+        try { localStorage.clear(); } catch { /* ignore */ }
+        window.location.reload();
+      }
+    }
+  };
 
   // 자동 펼침/접힘 제어용
   const autoShowRef = useRef(false);
-  const autoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const feedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    setStreak(tickStreak());
+    const tick = tickStreak();
+    setStreak(tick.state);
+    // 스트릭 변화 트래킹 — 리텐션 분석용
+    if (tick.kind === "extended") {
+      track.click("streak_extended", {
+        count: tick.state.count,
+        previous_count: tick.previousCount,
+        longest: tick.state.longest,
+      });
+      const ms = reachedMilestone(tick.state.count);
+      if (ms != null) {
+        track.click("streak_milestone", {
+          milestone: ms,
+          longest: tick.state.longest,
+        });
+      }
+    } else if (tick.kind === "broken") {
+      track.click("streak_broken", {
+        previous_count: tick.previousCount,
+        longest: tick.state.longest,
+      });
+    } else if (tick.kind === "first_day") {
+      track.click("streak_first_day");
+    }
     const refreshMissions = () => setMissions(getMissions());
     const refreshNotify = () => setNotify(loadNotifySettings());
     const refreshPoints = () => setPoints(getPointsState());
@@ -82,34 +120,19 @@ export default function DailyHeader() {
     return () => document.removeEventListener("pointerdown", onDown);
   }, [open]);
 
-  // 자동 펼침: 마운트 + 백그라운드 복귀
+  // 펄스 효과 트리거: 마운트 + 백그라운드 복귀.
+  // 이전엔 패널을 자동으로 펼쳤지만, 사용자가 클릭해서 열도록 두근두근만 유도.
   useEffect(() => {
-    const triggerAutoShow = (trigger: "mount" | "visibility") => {
-      setOpen(true);
-      autoShowRef.current = true;
-      track.screen("daily_missions_auto_show", { trigger });
-      if (autoTimerRef.current) clearTimeout(autoTimerRef.current);
-      autoTimerRef.current = setTimeout(() => {
-        if (autoShowRef.current) {
-          setOpen(false);
-          autoShowRef.current = false;
-        }
-      }, AUTO_SHOW_MS);
+    const triggerPulse = (trigger: "mount" | "visibility") => {
+      setPulseMission(true);
+      track.screen("daily_missions_auto_show", { trigger, mode: "pulse" });
     };
-
-    triggerAutoShow("mount");
-
+    triggerPulse("mount");
     const onVis = () => {
-      if (document.visibilityState === "visible") {
-        triggerAutoShow("visibility");
-      }
+      if (document.visibilityState === "visible") triggerPulse("visibility");
     };
     document.addEventListener("visibilitychange", onVis);
-
-    return () => {
-      document.removeEventListener("visibilitychange", onVis);
-      if (autoTimerRef.current) clearTimeout(autoTimerRef.current);
-    };
+    return () => document.removeEventListener("visibilitychange", onVis);
   }, []);
 
   useEffect(() => () => {
@@ -240,7 +263,10 @@ export default function DailyHeader() {
   return (
     <div ref={wrapRef} style={styles.wrap}>
       <div style={styles.row}>
-        <div style={{ ...styles.streakChip, ...(streak.count >= 7 ? styles.streakChipHot : {}) }}>
+        <div
+          style={{ ...styles.streakChip, ...(streak.count >= 7 ? styles.streakChipHot : {}) }}
+          onClick={handleStreakChipTap}
+        >
           <span style={styles.streakIcon}>🔥</span>
           <span style={styles.streakNum}>{streak.count}</span>
           <span style={styles.streakUnit}>일 연속</span>
@@ -257,11 +283,16 @@ export default function DailyHeader() {
           {notify.enabled && <span style={styles.notifyDot} />}
         </button>
         <button
-          style={{ ...styles.missionBtn, ...(allDone ? styles.missionBtnDone : {}) }}
+          style={{
+            ...styles.missionBtn,
+            ...(allDone ? styles.missionBtnDone : {}),
+            ...(pulseMission && !allDone ? styles.missionBtnPulse : {}),
+          }}
           onClick={() => {
             const next = !open;
             setOpen(next);
             autoShowRef.current = false;
+            setPulseMission(false);
             track.click("daily_missions_toggle", { expanded: next });
           }}
           aria-expanded={open}
@@ -486,6 +517,11 @@ const styles: Record<string, React.CSSProperties> = {
   missionBtnDone: {
     backgroundColor: "#ECFDF5", color: "#065F46",
     border: "1px solid #A7F3D0",
+  },
+  missionBtnPulse: {
+    backgroundColor: "#FEF3C7", color: "#92400E",
+    border: "1px solid #FDE68A",
+    animation: "qt-heartbeat 1.4s ease-in-out infinite",
   },
   missionLabel: { fontSize: "12px", fontWeight: 800 },
   missionCount: {

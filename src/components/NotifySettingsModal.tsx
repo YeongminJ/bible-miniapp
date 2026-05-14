@@ -8,7 +8,7 @@ import {
 } from "../lib/notify-settings";
 import { track } from "../lib/analytics";
 import { ensureUserKey } from "../lib/user-key";
-import { subscribeNotify, unsubscribeNotify } from "../lib/notify-api";
+import { ensureMapped, subscribeNotify, unsubscribeNotify } from "../lib/notify-api";
 
 interface Props {
   open: boolean;
@@ -17,9 +17,14 @@ interface Props {
 
 export default function NotifySettingsModal({ open, onClose }: Props) {
   const [s, setS] = useState<NotifySettings>(() => loadNotifySettings());
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (open) setS(loadNotifySettings());
+    if (open) {
+      setS(loadNotifySettings());
+      setError(null);
+    }
   }, [open]);
 
   if (!open) return null;
@@ -29,33 +34,58 @@ export default function NotifySettingsModal({ open, onClose }: Props) {
     saveNotifySettings(next);
   };
 
-  // 서버 동기화: enabled + times 기준으로 구독/해지 (다중 시각 지원).
-  // 토스 OAuth 매핑은 OnboardingSheet의 "시작하기"에서 한 번만 트리거 →
-  // 여기선 매핑 시도 안 함 (토글 시 토스 로그인 화면 갑자기 뜨는 거 방지).
-  // 매핑 안된 사용자라도 서버 row는 등록되지만 cron 발송 단계에서 skip돼요.
-  const syncRemote = async (next: NotifySettings) => {
-    const userKey = await ensureUserKey();
-    if (!userKey) return;
-    if (next.enabled && next.times.length > 0) {
-      await subscribeNotify(userKey, next.times);
-    } else {
-      await unsubscribeNotify(userKey);
-    }
-  };
-
-  const toggleEnabled = () => {
+  /**
+   * 알림 토글 ON — 토스 OAuth 매핑이 안 돼있으면 여기서 트리거.
+   * (이전엔 OnboardingSheet에서만 매핑 시도해서, 온보딩에서 알림 끄고 나중에 켠
+   *  사용자는 매핑이 영영 안 됨 → cron skip → 푸시 안 옴 = mapping_never_verified 통로)
+   */
+  const toggleEnabled = async () => {
+    if (busy) return;
     const enabling = !s.enabled;
+
+    // OFF — 매핑 필요 없음, 즉시 해지
+    if (!enabling) {
+      const next: NotifySettings = { ...s, enabled: false };
+      persist(next);
+      track.click("notify_settings_toggle", { enabled: false, times: s.times.join(",") });
+      const userKey = await ensureUserKey();
+      if (userKey) void unsubscribeNotify(userKey);
+      return;
+    }
+
+    // ON — 매핑 확인/시도 후에야 구독 + 토글 반영
+    setBusy(true);
+    setError(null);
+    const userKey = await ensureUserKey();
+    if (!userKey) {
+      track.click("notify_settings_anon_fail");
+      setError("기기 식별에 실패했어요. 잠시 후 다시 시도해 주세요.");
+      setBusy(false);
+      return;
+    }
+    track.click("notify_settings_map_attempt");
+    const mapped = await ensureMapped(userKey);
+    if (!mapped) {
+      track.click("notify_settings_map_fail");
+      setError("토스 로그인 연결에 실패했어요. 다시 시도해 주세요.");
+      setBusy(false);
+      return;
+    }
+    track.click("notify_settings_map_success");
+
     const next: NotifySettings = {
       ...s,
-      enabled: enabling,
-      optedInAt: enabling ? Date.now() : s.optedInAt,
+      enabled: true,
+      optedInAt: Date.now(),
     };
     persist(next);
-    track.click("notify_settings_toggle", { enabled: enabling, times: s.times.join(",") });
-    void syncRemote(next);
+    track.click("notify_settings_toggle", { enabled: true, times: s.times.join(",") });
+    await subscribeNotify(userKey, next.times);
+    setBusy(false);
   };
 
-  const toggleTime = (t: NotifyTime) => {
+  const toggleTime = async (t: NotifyTime) => {
+    if (busy) return;
     const has = s.times.includes(t);
     let times = has ? s.times.filter((x) => x !== t) : [...s.times, t];
     times = times.sort();
@@ -63,7 +93,9 @@ export default function NotifySettingsModal({ open, onClose }: Props) {
     const next = { ...s, times };
     persist(next);
     track.click("notify_settings_time_change", { time: t, enabled: !has, count: times.length });
-    if (next.enabled) void syncRemote(next);
+    if (!next.enabled) return;
+    const userKey = await ensureUserKey();
+    if (userKey) void subscribeNotify(userKey, next.times);
   };
 
   return (
@@ -79,11 +111,19 @@ export default function NotifySettingsModal({ open, onClose }: Props) {
         <div style={styles.body}>
           {/* 옵트인 토글 */}
           <button
-            style={{ ...styles.toggleRow, ...(s.enabled ? styles.toggleRowOn : {}) }}
+            style={{
+              ...styles.toggleRow,
+              ...(s.enabled ? styles.toggleRowOn : {}),
+              opacity: busy ? 0.7 : 1,
+              cursor: busy ? "wait" : "pointer",
+            }}
             onClick={toggleEnabled}
+            disabled={busy}
           >
             <div style={{ flex: 1, textAlign: "left" }}>
-              <div style={styles.toggleTitle}>오늘의 말씀 알림 받기</div>
+              <div style={styles.toggleTitle}>
+                {busy ? "토스 로그인 연결 중…" : "오늘의 말씀 알림 받기"}
+              </div>
               <div style={styles.toggleDesc}>
                 내가 정한 시각에 오늘의 성경 한 구절을 알려드려요.
               </div>
@@ -92,6 +132,15 @@ export default function NotifySettingsModal({ open, onClose }: Props) {
               <div style={{ ...styles.switchKnob, ...(s.enabled ? styles.switchKnobOn : {}) }} />
             </div>
           </button>
+
+          {error && (
+            <div style={styles.errorBanner} role="alert">
+              <span style={{ fontSize: 16 }}>⚠️</span>
+              <span style={{ fontSize: 12, color: "#B91C1C", fontWeight: 600, lineHeight: 1.4 }}>
+                {error}
+              </span>
+            </div>
+          )}
 
           {/* 시간 선택 */}
           <div style={styles.section}>
@@ -180,6 +229,12 @@ const styles: Record<string, React.CSSProperties> = {
   },
   toggleTitle: { fontSize: "15px", fontWeight: 800, color: "#111827", marginBottom: "4px" },
   toggleDesc: { fontSize: "12px", color: "#6B7280", lineHeight: 1.5 },
+  errorBanner: {
+    display: "flex", alignItems: "center", gap: "8px",
+    padding: "10px 12px", borderRadius: "10px",
+    backgroundColor: "#FEF2F2", border: "1px solid #FECACA",
+    marginBottom: "16px", marginTop: "-8px",
+  },
   switch: {
     width: "48px", height: "28px", borderRadius: "100px",
     backgroundColor: "#E5E7EB", position: "relative" as const,

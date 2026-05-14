@@ -34,6 +34,8 @@ export default function OnboardingSheet({ onDone, mode = "fresh" }: Props) {
   const [times, setTimes] = useState<NotifyTime[]>(
     initial.times.length > 0 ? initial.times : ["10:00", "20:00"]
   );
+  const [busy, setBusy] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
 
   const toggle = () => setEnabled((v) => !v);
   const toggleTime = (t: NotifyTime) => {
@@ -46,29 +48,68 @@ export default function OnboardingSheet({ onDone, mode = "fresh" }: Props) {
     });
   };
 
-  const finish = (action: "start" | "skip") => {
+  /**
+   * 시작/건너뛰기 흐름.
+   *
+   * 핵심 변경: 이전 버전은 markOnboarded() + onDone()을 즉시 실행하고 ensureMapped는 fire-and-forget
+   * 으로 던졌음. 그 결과 매핑이 실패해도 onboarded=true 상태가 되고, 다음 진입에서 recovery 트리거됨.
+   * (mapping_never_verified 케이스의 근본 원인)
+   *
+   * 새 흐름:
+   *  1) 알림 OFF 또는 skip: 매핑 불필요 → 기존처럼 즉시 종료
+   *  2) 알림 ON: ensureMapped를 *시트 안에서 await*. 단계별 트래킹 + 실패 시 에러 UI로 재시도.
+   *     매핑 성공 후에만 markOnboarded() + onDone(). 부수적인 subscribeNotify는 백그라운드.
+   *
+   * appLogin()은 user gesture가 필요한데 이전 .then() 체인은 gesture를 끊었을 가능성도 있음 →
+   * 명시적 await 체인으로 단일 task 안에서 흘리도록 변경.
+   */
+  const finish = async (action: "start" | "skip") => {
+    if (busy) return;
     const finalEnabled = action === "start" ? enabled : false;
-    saveNotifySettings({
-      enabled: finalEnabled,
-      times,
-      optedInAt: finalEnabled ? Date.now() : null,
-    });
-    markOnboarded();
     track.click("onboarding_complete", {
       action,
       notify_enabled: finalEnabled,
       times: times.join(","),
       mode,
     });
-    if (finalEnabled && times.length > 0) {
-      // 사용자가 고른 모든 시각을 등록 (서버가 user_reminders를 replace-all).
-      // 토스 OAuth 매핑이 필요(푸시 라우팅 키 발급) — 매핑 후 구독.
-      void ensureUserKey().then(async (userKey) => {
-        if (!userKey) return;
-        await ensureMapped(userKey); // 실패해도 구독은 진행 (서버 row 생성용)
-        await subscribeNotify(userKey, times);
-      });
+
+    // 알림 OFF / skip — 매핑 필요 없음
+    if (!finalEnabled || times.length === 0) {
+      saveNotifySettings({ enabled: false, times, optedInAt: null });
+      markOnboarded();
+      onDone();
+      return;
     }
+
+    // 알림 ON — 매핑 성공까지 시트 유지
+    setBusy(true);
+    setError(null);
+    saveNotifySettings({ enabled: true, times, optedInAt: Date.now() });
+
+    // 단계별로 독립된 이벤트 — 콘솔에서 카운트 직접 비교 가능 (파라미터는 카운트 안 보임)
+    const userKey = await ensureUserKey();
+    if (!userKey) {
+      track.click("onboarding_anon_fail", { mode });
+      setError("기기 식별에 실패했어요. 잠시 후 다시 시도해 주세요.");
+      setBusy(false);
+      return;
+    }
+
+    track.click("onboarding_map_attempt", { mode });
+    const mapped = await ensureMapped(userKey);
+    if (!mapped) {
+      track.click("onboarding_map_fail", { mode });
+      setError("토스 로그인 연결에 실패했어요. 다시 시도해 주세요.");
+      setBusy(false);
+      return;
+    }
+    track.click("onboarding_map_success", { mode });
+
+    // 구독은 매핑 완료 후라 cron이 정상 발송. 백그라운드로 던져도 안전.
+    void subscribeNotify(userKey, times);
+
+    markOnboarded();
+    track.click("onboarding_map_complete", { mode });
     onDone();
   };
 
@@ -154,12 +195,33 @@ export default function OnboardingSheet({ onDone, mode = "fresh" }: Props) {
           </div>
         </div>
 
+        {error && (
+          <div style={styles.errorBanner} role="alert">
+            <span style={styles.errorEmoji}>⚠️</span>
+            <span style={styles.errorText}>{error}</span>
+          </div>
+        )}
+
         <div style={styles.actions}>
-          <button style={styles.skipBtn} onClick={() => finish("skip")}>
+          <button
+            style={{ ...styles.skipBtn, opacity: busy ? 0.45 : 1, cursor: busy ? "not-allowed" : "pointer" }}
+            onClick={() => finish("skip")}
+            disabled={busy}
+          >
             {isRecovery ? "알림 끄기" : "지금은 건너뛰기"}
           </button>
-          <button style={styles.startBtn} onClick={() => finish("start")}>
-            {isRecovery ? "알림 다시 연결하기" : "시작하기"}
+          <button
+            style={{ ...styles.startBtn, opacity: busy ? 0.7 : 1, cursor: busy ? "wait" : "pointer" }}
+            onClick={() => finish("start")}
+            disabled={busy}
+          >
+            {busy
+              ? "연결 중…"
+              : error
+                ? "다시 시도하기"
+                : isRecovery
+                  ? "알림 다시 연결하기"
+                  : "시작하기"}
           </button>
         </div>
       </div>
@@ -290,4 +352,12 @@ const styles: Record<string, React.CSSProperties> = {
   recoveryBannerDesc: {
     fontSize: "12px", color: "#92400E", lineHeight: 1.5, opacity: 0.85,
   },
+  errorBanner: {
+    display: "flex", alignItems: "center", gap: "8px",
+    padding: "10px 12px", borderRadius: "10px",
+    backgroundColor: "#FEF2F2", border: "1px solid #FECACA",
+    marginTop: "4px",
+  },
+  errorEmoji: { fontSize: "16px" },
+  errorText: { fontSize: "12px", color: "#B91C1C", lineHeight: 1.4, fontWeight: 600 },
 };

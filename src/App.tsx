@@ -7,10 +7,15 @@ import BibleReadingTab from "./components/BibleReadingTab";
 import DailyVerse from "./components/DailyVerse";
 import DailyHeader from "./components/DailyHeader";
 import OnboardingSheet from "./components/OnboardingSheet";
-import { hasOnboarded, resetOnboarded } from "./lib/onboarding";
+import { hasOnboarded, resetOnboarded, getOnboardedAt } from "./lib/onboarding";
 import { UserProvider, useUser } from "./lib/UserContext";
 import { track } from "./lib/analytics";
-import { isMappingVerified } from "./lib/mapping-cache";
+import {
+  isMappingVerified,
+  wasMappingEverVerified,
+  rememberAnonHash,
+  getLastAnonHash,
+} from "./lib/mapping-cache";
 import { checkMappingStatus, ensureUserName } from "./lib/notify-api";
 import { loadNotifySettings } from "./lib/notify-settings";
 import { ensureUserKey } from "./lib/user-key";
@@ -91,10 +96,12 @@ function AppContent() {
 
   // 표시 이름 동기화 (공유 메시지에 "{이름}님" prefix 용도).
   // 매핑된 사용자만 의미 있고, 캐시 히트면 네트워크 호출 없이 즉시 반환.
+  // 부수적으로 anonHash를 캐시해 두면 다음에 recovery가 트리거됐을 때 진단이 가능해진다.
   useEffect(() => {
     void (async () => {
       const hash = await ensureUserKey();
       if (!hash) return;
+      rememberAnonHash(hash);
       await ensureUserName(hash);
     })();
   }, []);
@@ -147,11 +154,40 @@ function AppContent() {
       const { isMapped, ok } = await checkMappingStatus(hash);
       if (cancelled) return;
       if (ok && !isMapped) {
-        track.screen("onboarding_recovery_trigger", { reason: "missing_toss_mapping" });
+        // 진단: 왜 recovery가 발생했는지 4가지 케이스로 분류
+        //  1) anon_key_changed       — 이전에 캐시된 hash와 다름 → 재설치/디바이스 변경 가능성
+        //  2) mapping_lost_after_verified — 과거에 verified 됐는데 서버에서 사라짐 (가장 심각)
+        //  3) mapping_never_verified — onboarded 됐지만 verified 도달 못한 채로 흘러옴
+        //  4) no_prior_anon_cache    — 캐시 자체가 없음 (앱 첫 진입 후 곧바로 recovery)
+        const lastHash = getLastAnonHash();
+        const anonKeyMatch = lastHash != null && lastHash === hash;
+        const everVerified = wasMappingEverVerified();
+        const onboardedAt = getOnboardedAt();
+        const daysSinceOnboarding =
+          onboardedAt != null
+            ? Math.floor((Date.now() - onboardedAt) / 86400000)
+            : null;
+        const reason: string =
+          lastHash == null
+            ? "no_prior_anon_cache"
+            : !anonKeyMatch
+              ? "anon_key_changed"
+              : everVerified
+                ? "mapping_lost_after_verified"
+                : "mapping_never_verified";
+        track.screen("onboarding_recovery_trigger", {
+          reason,
+          ever_verified: everVerified,
+          anon_key_match: anonKeyMatch,
+          had_prior_anon_cache: lastHash != null,
+          days_since_onboarding: daysSinceOnboarding,
+        });
         resetOnboarded();
         setOnboardingMode("recovery");
         setShowOnboarding(true);
       }
+      // hash가 새로 잡혔으면 다음 세션 진단을 위해 캐시
+      rememberAnonHash(hash);
       // ok && isMapped인 경우 checkMappingStatus 내부에서 markMappingVerified 호출됨
       // ok=false는 네트워크/서버 오류이므로 절대 reset하지 않음
     })();

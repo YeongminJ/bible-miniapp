@@ -6,6 +6,12 @@ const AD_GROUP_ID =
   (import.meta.env.VITE_AD_GROUP_ID as string | undefined) ??
   "ait.v2.live.c9e7e5f5fd554e91";
 
+// 리워드형 광고용 (통독 듣기 진입 시 사용 예정).
+// 키 미발급 상태면 undefined → showInterstitialAd가 기본 광고로 fallback.
+// 키 발급 후 .env 에 VITE_REWARD_AD_GROUP_ID 를 채우면 자동 적용.
+export const REWARD_AD_GROUP_ID: string | undefined =
+  (import.meta.env.VITE_REWARD_AD_GROUP_ID as string | undefined) || undefined;
+
 const LOAD_TIMEOUT_MS = 6000; // 광고 로드 대기 한계
 const SHOW_TIMEOUT_MS = 30000; // 광고 노출~닫힘 대기 한계 (사용자가 안 닫는 경우 안전망)
 
@@ -28,11 +34,15 @@ function isAdSupported(): boolean {
 
 // 전면광고 보여주고 닫힐 때까지 대기.
 // 항상 정해진 시간 안에 resolve — 미지원/실패/타임아웃 시 reason 반환.
-export async function showInterstitialAd(): Promise<AdResult> {
+// options.adGroupId 를 주면 해당 광고 그룹을 사용 (리워드용 등). 안 주면 기본 전면광고.
+export async function showInterstitialAd(
+  options?: { adGroupId?: string },
+): Promise<AdResult> {
   if (!isAdSupported()) {
     console.info("[ad] fullscreen ad not supported — skipping");
     return { shown: false, reason: "unsupported" };
   }
+  const adGroupId = options?.adGroupId ?? AD_GROUP_ID;
 
   return new Promise<AdResult>((resolve) => {
     let unsubscribeLoad: (() => void) | null = null;
@@ -63,7 +73,7 @@ export async function showInterstitialAd(): Promise<AdResult> {
 
     try {
       unsubscribeLoad = loadFullScreenAd({
-        options: { adGroupId: AD_GROUP_ID },
+        options: { adGroupId },
         onEvent: (e) => {
           if (e.type !== "loaded") return;
           if (loadTimer) { clearTimeout(loadTimer); loadTimer = null; }
@@ -76,7 +86,7 @@ export async function showInterstitialAd(): Promise<AdResult> {
 
           try {
             unsubscribeShow = showFullScreenAd({
-              options: { adGroupId: AD_GROUP_ID },
+              options: { adGroupId },
               onEvent: (se) => {
                 if (se.type === "dismissed") settle({ shown: true });
                 else if (se.type === "failedToShow") settle({ shown: false, reason: "show-failed" });
